@@ -58,11 +58,14 @@
 
         djui_hud_set_color(255, 0, 0, 100);
         djui_hud_render_rect(100, 0, 100, 100);
-
-        //update_rainbow()
+        update_rainbow()
         djui_hud_set_color(rainbowColor.r, rainbowColor.g, rainbowColor.b, 200);
-        djui_hud_render_rect(djui_hud_screen_get_width() - 100, 0, 100, 100);
+        djui_hud_render_rect(djui_hud_get_screen_width() - 100, 0, 100, 100);
 
+        djui_hud_set_font(FONT_ALIASED);
+        djui_hud_set_color(255, 255, 0, 255);
+        djui_hud_render_rect(10, 10, djui_hud_measure_text("Hello, world!"), 20);
+        console.log(djui_hud_measure_text("Hello, world!"));
         djui_hud_set_color(0, 255, 0, 255);
         djui_hud_print_text("Hello, world!", 10, 10, 1);
     }
