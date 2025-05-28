@@ -1,3 +1,4 @@
+// Set up canvas for rendering
 if (!document.body) {
     document.documentElement.appendChild(document.createElement('body'));
 }
@@ -25,6 +26,8 @@ document.body.appendChild(canvas);
 
 let resN64Math = window.innerHeight / 240;
 const context = canvas.getContext('2d');
+
+// The real stuffs
 
 const RESOLUTION_DJUI = 1;
 const RESOLUTION_N64 = 2;
@@ -119,6 +122,29 @@ function djui_hud_measure_text(text) {
     return 0;
 }
 
+function get_texture_info(texName) {
+    const img = new Image();
+    img.src = texName;
+    return img;
+}
+
+const gTextures = {
+    luigi: get_texture_info('djui-js/luigi.png'),
+};
+
+function djui_hud_render_texture(texture, x, y, width, height) {
+    if (texture instanceof HTMLImageElement) {
+        if (currentResolution === RESOLUTION_DJUI) {
+            context.drawImage(texture, x, y, width, height);
+        } else if (currentResolution === RESOLUTION_N64) {
+            context.drawImage(texture, x * resN64Math, y * resN64Math, width * resN64Math, height * resN64Math);
+        }
+    } else {
+        console.warn(`Texture '${texture}' not found.`);
+    }
+}
+
+
 const hookedFunctions = [];
 function hook_event(func) {
     if (typeof func === 'function') {
@@ -143,6 +169,7 @@ function djui_on_render() {
         djui_hud_print_text(errorMsg, djui_hud_get_screen_width()*0.5 - djui_hud_measure_text(errorMsg)*0.5 + 1, 31, 1);
         djui_hud_set_color(255, 0, 0, 255); // Red color for error
         djui_hud_print_text(errorMsg, djui_hud_get_screen_width()*0.5 - djui_hud_measure_text(errorMsg)*0.5, 30, 1);
+        throw new Error(error);
     }
 }
 setInterval(djui_on_render, 1000 / 30); // Update 30 times a second

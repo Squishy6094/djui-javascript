@@ -13,61 +13,241 @@
 
 <script type="text/javascript" src="djui-js/djui.js"></script>
 <script type="text/javascript">
-    move = 0
-    var rainbowColor = { r: 255, g: 0, b: 0 };
-    var rainbowState = 0;
+    // This file is an example of how to render to the screen
 
-    function update_rainbow() {
-        switch (rainbowState) {
-            case 0:
-                rainbowColor.r += 10;
-                if (rainbowColor.r >= 255) rainbowState = 1;
-                break;
-            case 1:
-                rainbowColor.b -= 10;
-                if (rainbowColor.b <= 0) rainbowState = 2;
-                break;
-            case 2:
-                rainbowColor.g += 10;
-                if (rainbowColor.g >= 255) rainbowState = 3;
-                break;
-            case 3:
-                rainbowColor.r -= 10;
-                if (rainbowColor.r <= 0) rainbowState = 4;
-                break;
-            case 4:
-                rainbowColor.b += 10;
-                if (rainbowColor.b >= 255) rainbowState = 5;
-                break;
-            case 5:
-                rainbowColor.g -= 10;
-                if (rainbowColor.g <= 0) rainbowState = 0;
-                break;
+    function test_text() {
+        // set text and scale
+        const text = "This is example text in the bottom right.";
+        const scale = 1;
+
+        // render to native screen space, with the MENU font
+        djui_hud_set_resolution(RESOLUTION_DJUI);
+        djui_hud_set_font(FONT_NORMAL); // Originally menu font
+
+        // get width of screen and text
+        const screenWidth = djui_hud_get_screen_width();
+        const width = djui_hud_measure_text(text) * scale;
+
+        // get height of screen and text
+        const screenHeight = djui_hud_get_screen_height();
+        const height = 64 * scale;
+
+        // set location
+        const x = screenWidth - width;
+        const y = screenHeight - height;
+
+        // set color and render
+        djui_hud_set_color(255, 0, 255, 255);
+        djui_hud_print_text(text, x, y, scale);
+    }
+
+    function test_texture() {
+        // render to the N64's screen space
+        djui_hud_set_resolution(RESOLUTION_N64);
+
+        const tex = gTextures.luigi;
+
+        // color and render
+        djui_hud_set_color(255, 0, 255, 255);
+        djui_hud_render_texture(tex, 256, 64, 1, 1);
+
+        // render texture, but cut in half
+        djui_hud_render_texture_tile(tex, 256, 84, 2, 1, 0, 0, 8, 16);
+    }
+
+    function test_rect() {
+        // render to native screen space
+        djui_hud_set_resolution(RESOLUTION_DJUI);
+
+        // set location
+        let x = 512;
+        let y = 512;
+
+        // set width/height
+        let w = 256;
+        let h = 256;
+
+        // set color and render first rectangle
+        djui_hud_set_color(255, 0, 0, 128);
+        djui_hud_render_rect(x, y, w, h);
+
+        // adjust location and size
+        x = x + 16;
+        y = y + 16;
+        w = w - 32;
+        h = h - 32;
+
+        // set color and render second rectangle
+        djui_hud_set_color(0, 255, 0, 128);
+        djui_hud_render_rect(x, y, w, h);
+
+        // adjust location and size
+        x = x + 16;
+        y = y + 16;
+        w = w - 32;
+        h = h - 32;
+
+        // set color and render third rectangle
+        djui_hud_set_color(0, 0, 255, 128);
+        djui_hud_render_rect(x, y, w, h);
+    }
+
+    function test_rainbow_text() {
+        // this function is incredibly silly
+        // don't do anything like this
+        const text = "HELLO WORLD";
+        const scale = 3;
+
+        const gt = get_global_timer();
+
+        djui_hud_set_resolution(RESOLUTION_DJUI);
+        djui_hud_set_font(FONT_NORMAL);
+
+        for (let i = 0; i <= 255; i++) {
+            const j = gt / 50;
+            let r = Math.sin(0.00 + i / 15 + j) * 127 + 127;
+            let g = Math.sin(0.33 + i / 33 + j) * 127 + 127;
+            let b = Math.sin(0.66 + i / 77 + j) * 127 + 127;
+            let x = 64 + i;
+            let y = 64 + i + Math.sin(i / 40 + j) * 64;
+            if (i === 255) {
+                r = 0;
+                g = 0;
+                b = 0;
+            }
+            djui_hud_set_color(r, g, b, i);
+            djui_hud_print_text(text, x, y, scale);
         }
-        rainbowColor.r = Math.max(0, Math.min(255, rainbowColor.r));
-        rainbowColor.g = Math.max(0, Math.min(255, rainbowColor.g));
-        rainbowColor.b = Math.max(0, Math.min(255, rainbowColor.b));
+    }
+
+    function test_rotation() {
+        // render to native screen space
+        djui_hud_set_resolution(RESOLUTION_DJUI);
+
+        // get SM64 global timer
+        const gt = get_global_timer();
+
+        // rotate object around pivot (center)
+        djui_hud_set_rotation(gt * 512, 0.5, 0.5);
+
+        // color and render
+        djui_hud_set_color(255, 255, 0, 128);
+        djui_hud_render_rect(1280, 512, 64, 64);
+
+        // rotate object around pivot (top-left); color and render
+        djui_hud_set_rotation(gt * 512, 0, 0);
+        djui_hud_set_color(0, 255, 255, 128);
+        djui_hud_render_rect(1280, 512, 64, 64);
+
+        // rotate object around pivot (bottom-right); color and render
+        djui_hud_set_rotation(gt * 512, 1, 1);
+        djui_hud_set_color(255, 0, 255, 128);
+        djui_hud_render_rect(1280, 512, 64, 64);
+    }
+
+    function test_filtering() {
+        const scale = 1;
+
+        // reset rotation from earlier
+        djui_hud_set_rotation(0, 0, 0);
+
+        // render to the N64's screen space with the HUD font
+        djui_hud_set_resolution(RESOLUTION_N64);
+        djui_hud_set_font(FONT_HUD);
+
+        djui_hud_reset_color();
+
+        // get height of screen and text
+        const screenHeight = djui_hud_get_screen_height();
+        const height = 16 * scale;
+
+        let y = screenHeight - height;
+
+        // set filtering and render
+        djui_hud_set_filter(FILTER_NEAREST);
+        djui_hud_print_text("NEAREST", 0, y, scale);
+
+        // adjust position
+        y = y - height;
+
+        // set filtering and render
+        djui_hud_set_filter(FILTER_LINEAR);
+        djui_hud_print_text("LINEAR", 0, y, scale);
+    }
+
+    function test_world_to_screen() {
+        // render to the N64's screen space (recommended for this)
+        djui_hud_set_resolution(RESOLUTION_N64);
+
+        // reset filtering from earlier
+        djui_hud_set_filter(FILTER_NEAREST);
+
+        // project to mario's position
+        const out = { x: 0, y: 0, z: 0 };
+        djui_hud_world_pos_to_screen_pos(gMarioStates[0].pos, out);
+
+        // get player's character texture
+        const tex = gMarioStates[0].character.hudHeadTexture;
+
+        djui_hud_reset_color();
+        djui_hud_render_texture(tex, out.x, out.y, 1, 1);
+    }
+
+    function test_mouse() {
+        // render to native screen space (recommended for this)
+        djui_hud_set_resolution(RESOLUTION_DJUI);
+
+        djui_hud_reset_color();
+
+        // get mouse position
+        const mouseX = djui_hud_get_mouse_x();
+        const mouseY = djui_hud_get_mouse_y();
+        const scale = 4;
+
+        djui_hud_render_texture(gTextures.arrow_up, mouseX, mouseY, scale, scale);
+    }
+
+    function test_pow_meter() {
+        djui_hud_set_resolution(RESOLUTION_N64);
+
+        const hp = gMarioStates[0].health;
+        hud_render_power_meter(hp, 16, 128, 24, 24); // health value ranges from 255 (0xFF in hex) to 2176 (0x880 in hex)
+    }
+
+    // HOOK_ON_HUD_RENDER renders above SM64's hud
+    function render_example() {
+        test_text();
+        test_rect();
+        test_texture();
+        test_rainbow_text();
+        test_rotation();
+        test_filtering();
+        test_world_to_screen();
+        test_pow_meter();
+        test_mouse();
+    }
+
+    function djui_hud_print_text_centered(text, x, y, scale) {
+        var textWidth = djui_hud_measure_text(text) * scale;
+        djui_hud_print_text(text, x - textWidth * 0.5, y, scale);
     }
 
     function hud_render() {
-        move = move + 1
+        //render_example()
         djui_hud_set_resolution(RESOLUTION_N64);
+        width = djui_hud_get_screen_width();
+        height = djui_hud_get_screen_height();
+        djui_hud_set_color(0, 0, 0, 150);
+        djui_hud_render_rect(width * 0.5 - 79, height*0.5 - 104, 158, 208);
+        djui_hud_render_rect(width * 0.5 - 75, height*0.5 - 100, 150, 200);
 
-        djui_hud_set_color(0, 0, 0, 255);
-        djui_hud_render_rect(0 + Math.sin(move / 10) * 30, 0, 100, 100);
-
-        djui_hud_set_color(255, 0, 0, 100);
-        djui_hud_render_rect(100, 0, 100, 100);
-        update_rainbow()
-        djui_hud_set_color(rainbowColor.r, rainbowColor.g, rainbowColor.b, 200);
-        djui_hud_render_rect(djui_hud_get_screen_width() - 100, 0, 100, 100);
-
+        // Header
         djui_hud_set_font(FONT_ALIASED);
-        djui_hud_set_color(255, 255, 0, 255);
-        djui_hud_render_rect(10, 10, djui_hud_measure_text("Hello, world!"), 20);
-        console.log(djui_hud_measure_text("Hello, world!"));
-        djui_hud_set_color(0, 255, 0, 255);
-        djui_hud_print_text("Hello, world!", 10, 10, 1);
+        djui_hud_set_color(255, 255, 255, 255);
+        djui_hud_print_text_centered("DJUI Javascript", width * 0.5, height * 0.5 - 80, 0.8);
+        djui_hud_set_font(FONT_NORMAL);
+        djui_hud_print_text_centered("This is a port of DJUI to Javascript", width * 0.5, height * 0.5 - 60, 0.4);
+        djui_hud_render_texture(gTextures.luigi, width * 0.5 - 64, height * 0.5 - 32, 1, 1);
     }
 
     hook_event(hud_render);   
