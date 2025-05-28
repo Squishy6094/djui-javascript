@@ -11,13 +11,62 @@
     -->
 </head>
 
-<script type="text/javascript" src="djui.js">
-    function on_render() {
-        djui_hud_set_resolution(RESOLUTION_N64);
-        djui_hud_set_color(255, 0, 0, 255);
-        djui_hud_render_rect(10, 10, 20, 50)
+<script type="text/javascript" src="djui-js/djui.js"></script>
+<script type="text/javascript">
+    move = 0
+    var rainbowColor = { r: 255, g: 0, b: 0 };
+    var rainbowState = 0;
+
+    function update_rainbow() {
+        switch (rainbowState) {
+            case 0:
+                rainbowColor.r += 10;
+                if (rainbowColor.r >= 255) rainbowState = 1;
+                break;
+            case 1:
+                rainbowColor.b -= 10;
+                if (rainbowColor.b <= 0) rainbowState = 2;
+                break;
+            case 2:
+                rainbowColor.g += 10;
+                if (rainbowColor.g >= 255) rainbowState = 3;
+                break;
+            case 3:
+                rainbowColor.r -= 10;
+                if (rainbowColor.r <= 0) rainbowState = 4;
+                break;
+            case 4:
+                rainbowColor.b += 10;
+                if (rainbowColor.b >= 255) rainbowState = 5;
+                break;
+            case 5:
+                rainbowColor.g -= 10;
+                if (rainbowColor.g <= 0) rainbowState = 0;
+                break;
+        }
+        rainbowColor.r = Math.max(0, Math.min(255, rainbowColor.r));
+        rainbowColor.g = Math.max(0, Math.min(255, rainbowColor.g));
+        rainbowColor.b = Math.max(0, Math.min(255, rainbowColor.b));
     }
-    on_render()
-    hook_event(on_render)
+
+    function hud_render() {
+        move = move + 1
+        djui_hud_set_resolution(RESOLUTION_N64);
+
+        djui_hud_set_color(0, 0, 0, 255);
+        djui_hud_render_rect(0 + Math.sin(move / 10) * 30, 0, 100, 100);
+
+        djui_hud_set_color(255, 0, 0, 100);
+        djui_hud_render_rect(100, 0, 100, 100);
+
+        //update_rainbow()
+        djui_hud_set_color(rainbowColor.r, rainbowColor.g, rainbowColor.b, 200);
+        djui_hud_render_rect(djui_hud_screen_get_width() - 100, 0, 100, 100);
+
+        djui_hud_set_color(0, 255, 0, 255);
+        djui_hud_print_text("Hello, world!", 10, 10, 1);
+    }
+
+    hook_event(hud_render);   
 </script>
 </html> 
