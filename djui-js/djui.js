@@ -156,10 +156,10 @@ function djui_hud_apply_link(url) {
         canvas._djui_link_boxes = [];
     }
     // Store the url with the box so it can be opened on click
-    canvas._djui_link_boxes.push({ ...last, url });
+    if (last) {
+        canvas._djui_link_boxes.push({ ...last, url });
+    }
 }
-// Make the function globally accessible (important for github.io and similar hosts)
-window.djui_hud_apply_link = djui_hud_apply_link;
 
 function djui_hud_render_rect(x, y, width, height) {
     const scale = get_res_scale();
