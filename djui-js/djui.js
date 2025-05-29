@@ -119,6 +119,46 @@ function apply_current_rotation() {
 function restore_rotation() {
     context.restore();
 }
+
+function get_mous_pos(e) {
+    const rect = canvas.getBoundingClientRect();
+    return {
+        x: (e.clientX - rect.left),
+        y: (e.clientY - rect.top)
+    };
+}
+
+function djui_hud_apply_link(url) {
+    // Create an invisible clickable box over the canvas area
+    const last = renderList[renderList.length - 1];
+
+    // Only add the event listener once
+    if (!canvas._djui_link_listener) {
+        canvas.addEventListener('click', function(e) {
+            for (const box of canvas._djui_link_boxes || []) {
+                const mouse = get_mous_pos(e);
+                if (
+                    mouse.x >= box.x &&
+                    mouse.x <= box.x + box.width &&
+                    mouse.y >= box.y &&
+                    mouse.y <= box.y + box.height
+                ) {
+                    if (box.url) {
+                        window.open(box.url, '_blank');
+                    }
+                }
+            }
+        });
+        canvas._djui_link_listener = true;
+    }
+
+    if (!canvas._djui_link_boxes) {
+        canvas._djui_link_boxes = [];
+    }
+    // Store the url with the box so it can be opened on click
+    canvas._djui_link_boxes.push({ ...last, url });
+}
+
 function djui_hud_render_rect(x, y, width, height) {
     const scale = get_res_scale();
     add_to_render_list(x * scale, y * scale, width * scale, height * scale);
