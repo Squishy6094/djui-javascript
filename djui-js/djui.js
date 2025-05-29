@@ -4,15 +4,6 @@ if (!document.body) {
 }
 
 const canvas = document.createElement('canvas');
-// Remove anti-aliasing
-canvas.style.imageRendering = 'optimizeSpeed';
-canvas.style.imageRendering = '-moz-crisp-edges';
-canvas.style.imageRendering = '-o-crisp-edges';
-canvas.style.imageRendering = '-webkit-optimize-contrast';
-canvas.style.imageRendering = 'pixelated';
-canvas.style.imageRendering = 'optimize-contrast';
-canvas.style.imageRendering = 'crisp-edges';
-canvas.style.msInterpolationMode = 'nearest-neighbor';
 
 canvas.id = 'myCanvas';
 canvas.style.position = 'fixed';
@@ -32,6 +23,41 @@ const context = canvas.getContext('2d');
 const RESOLUTION_DJUI = 1;
 const RESOLUTION_N64 = 2;
 let currentResolution = RESOLUTION_DJUI;
+let resDJUIScale = 1; // Scale for DJUI resolution
+
+// configDjuiScale: 0 = auto, 1 = 0.5, 2 = 0.85, 3 = 1.0, 4 = 1.5
+let configDjuiScale = 0; // You can set this elsewhere as needed
+
+function djui_gfx_get_scale() {
+    if (configDjuiScale === 0) { // auto
+        const windowHeight = window.innerHeight;
+        if (windowHeight < 768) {
+            return 0.5;
+        } else if (windowHeight < 1440) {
+            return 1.0;
+        } else {
+            return 1.5;
+        }
+    } else {
+        switch (configDjuiScale) {
+            case 1:  return 0.5;
+            case 2:  return 0.85;
+            case 3:  return 1.0;
+            case 4:  return 1.5;
+            default: return 1.0;
+        }
+    }
+}
+
+function get_res_scale() {
+    if (currentResolution === RESOLUTION_DJUI) {
+        return resDJUIScale;
+    }
+    else if (currentResolution === RESOLUTION_N64) {
+        return resN64Math;
+    }
+    return 1;
+}
 
 function djui_hud_set_resolution(res) {
     if (res !== RESOLUTION_DJUI && res !== RESOLUTION_N64) {
@@ -41,20 +67,17 @@ function djui_hud_set_resolution(res) {
 }
 
 function djui_hud_get_screen_width() {
-    if (currentResolution === RESOLUTION_DJUI) {
-        return canvas.width;
-    } else if (currentResolution === RESOLUTION_N64) {
-        return Math.floor(canvas.width / resN64Math); // N64 width is based off constant hieght
-    }
+    return canvas.width / get_res_scale();
 }
 
 function djui_hud_get_screen_height() {
     if (currentResolution === RESOLUTION_DJUI) {
-        return canvas.height;
+        return canvas.height / resDJUIScale;
     } else if (currentResolution === RESOLUTION_N64) {
         return 240; // N64 height is always 240 pixels
     }
 }
+
 function djui_hud_set_color(r, g, b, a) {
     // Clamp alpha to [0, 1] if it's in [0, 255]
     a = a / 255;
@@ -62,12 +85,46 @@ function djui_hud_set_color(r, g, b, a) {
     context.fillStyle = `rgb(${r}, ${g}, ${b})`;
 }
 
-function djui_hud_render_rect(x, y, width, height) {
-    if (currentResolution === RESOLUTION_DJUI) {
-        context.fillRect(x, y, width, height);
-    } else if (currentResolution === RESOLUTION_N64) {
-        context.fillRect(x * resN64Math, y * resN64Math, width * resN64Math, height * resN64Math);
+
+let currentRotation = 0;
+let currentPivotX = 0;
+let currentPivotY = 0;
+
+function djui_hud_set_rotation(rotation, pivotX, pivotY) {
+    // Convert 16-bit integer to degrees
+    currentRotation = (-rotation / 0x10000) * 360;
+    currentPivotX = pivotX;
+    currentPivotY = pivotY;
+}
+const renderList = [];
+
+function add_to_render_list(x, y, width, height) {
+    renderList.push({ x, y, width, height });
+}
+function apply_current_rotation() {
+    if (renderList.length > 0) {
+        const last = renderList[renderList.length - 1];
+        if (last) {
+            let pivotX = last.x + last.width * currentPivotX;
+            let pivotY = last.y + last.height * currentPivotY;
+            context.save();
+            context.translate(pivotX, pivotY);
+            context.rotate(currentRotation * Math.PI / 180); // Convert degrees to radians
+            context.translate(-pivotX, -pivotY);
+        }
     }
+}
+
+// Restore context after drawing each object
+function restore_rotation() {
+    context.restore();
+}
+function djui_hud_render_rect(x, y, width, height) {
+    const scale = get_res_scale();
+    add_to_render_list(x * scale, y * scale, width * scale, height * scale);
+    apply_current_rotation();
+    context.fillRect(x * scale, y * scale, width * scale, height * scale);
+    restore_rotation();
 }
 
 const fontStyles = document.createElement('style');
@@ -91,35 +148,22 @@ function djui_hud_set_font(font) {
         currentFontSize = 24;
     }
 }
-
-function djui_hud_print_text(text, x, y, scale) {
-    context.textBaseline = 'top'; // Align text at the top
-    if (currentResolution === RESOLUTION_DJUI) {
-        context.font = `${scale * currentFontSize}px ${currentFont}`;
-        context.fillText(text, x, y);
-    } else if (currentResolution === RESOLUTION_N64) {
-        context.font = `${scale * currentFontSize * resN64Math}px ${currentFont}`;
-        context.fillText(text, x * resN64Math, y * resN64Math);
-    }
-}
-
 function djui_hud_measure_text(text) {
-    // Use CanvasRenderingContext2D.measureText for better performance and accuracy
+    const scale = get_res_scale();
     context.save();
     context.textBaseline = 'top';
-    if (currentResolution === RESOLUTION_DJUI) {
-        context.font = `${currentFontSize}px ${currentFont}`;
-        const metrics = context.measureText(text);
-        context.restore();
-        return metrics.width;
-    } else if (currentResolution === RESOLUTION_N64) {
-        context.font = `${currentFontSize * resN64Math}px ${currentFont}`;
-        const metrics = context.measureText(text);
-        context.restore();
-        return metrics.width / resN64Math;
-    }
+    context.font = `${currentFontSize * scale}px ${currentFont}`;
+    const metrics = context.measureText(text);
     context.restore();
-    return 0;
+    return metrics.width / scale;
+}
+
+function djui_hud_print_text(text, x, y, scale) {
+    const resScale = get_res_scale();
+    context.textBaseline = 'top'; // Align text at the top
+    context.imageSmoothingEnabled = false;
+    context.font = `${scale * currentFontSize * resScale}px ${currentFont}`;
+    context.fillText(text, x * resScale, y * resScale);
 }
 
 function get_texture_info(texName) {
@@ -129,21 +173,45 @@ function get_texture_info(texName) {
 }
 
 const gTextures = {
+    // mario: get_texture_info('djui-js/mario.png'),
     luigi: get_texture_info('djui-js/luigi.png'),
+    toad: get_texture_info('djui-js/toad.png'),
+    waluigi: get_texture_info('djui-js/waluigi.png'),
+    wario: get_texture_info('djui-js/wario.png'),
 };
-
 function djui_hud_render_texture(texture, x, y, width, height) {
+    const scale = get_res_scale();
+    const imgWidth = width * texture.naturalWidth;
+    const imgHeight = height * texture.naturalHeight;
+    add_to_render_list(x * scale, y * scale, imgWidth * scale, imgHeight * scale);
+    apply_current_rotation();
     if (texture instanceof HTMLImageElement) {
-        if (currentResolution === RESOLUTION_DJUI) {
-            context.drawImage(texture, x, y, width, height);
-        } else if (currentResolution === RESOLUTION_N64) {
-            context.drawImage(texture, x * resN64Math, y * resN64Math, width * resN64Math, height * resN64Math);
-        }
+        context.imageSmoothingEnabled = false;
+        context.drawImage(texture, x * scale, y * scale, imgWidth * scale, imgHeight * scale);
     } else {
         console.warn(`Texture '${texture}' not found.`);
     }
+    restore_rotation();
 }
 
+function djui_hud_render_texture_tile(texture, x, y, width, height, tileX, tileY, tileWidth, tileHeight) {
+    const imgWidth = (width * tileWidth * tileWidth / texture.naturalWidth);
+    const imgHeight = (height * tileHeight * tileHeight / texture.naturalHeight);
+    const scale = get_res_scale();
+    add_to_render_list(x * scale, y * scale, imgWidth * scale, imgHeight * scale);
+    apply_current_rotation();
+    if (texture instanceof HTMLImageElement) {
+        context.imageSmoothingEnabled = false;
+        context.drawImage(
+            texture,
+            tileX, tileY, tileWidth, tileHeight,
+            x * scale, y * scale, imgWidth * scale, imgHeight * scale
+        );
+    } else {
+        console.warn(`Texture '${texture}' not found.`);
+    }
+    restore_rotation();
+}
 
 const hookedFunctions = [];
 function hook_event(func) {
@@ -153,9 +221,12 @@ function hook_event(func) {
 }
 
 function djui_on_render() {
+    renderList.length = 0;
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
     resN64Math = window.innerHeight / 240;
+    resDJUIScale = djui_gfx_get_scale();
+    console.log(`DJUI Scale: ${resDJUIScale}`);
     context.clearRect(0, 0, canvas.width, canvas.height);
     try {
         for (const fn of hookedFunctions) {
@@ -163,13 +234,15 @@ function djui_on_render() {
         }
     } catch (error) {
         djui_hud_set_resolution(RESOLUTION_DJUI);
+        djui_hud_set_font(FONT_NORMAL);
+        djui_hud_set_rotation(0, 0, 0);
         const fileName = window.location.pathname.split('/').pop();
         const errorMsg = `'${fileName}' has script errors!`;
         djui_hud_set_color(0, 0, 0, 255); // Red color for error
         djui_hud_print_text(errorMsg, djui_hud_get_screen_width()*0.5 - djui_hud_measure_text(errorMsg)*0.5 + 1, 31, 1);
         djui_hud_set_color(255, 0, 0, 255); // Red color for error
         djui_hud_print_text(errorMsg, djui_hud_get_screen_width()*0.5 - djui_hud_measure_text(errorMsg)*0.5, 30, 1);
-        throw new Error(error);
+        throw new Error(error + " Line: " + error.lineNumber + " in " + fileName);
     }
 }
 setInterval(djui_on_render, 1000 / 30); // Update 30 times a second

@@ -15,6 +15,11 @@
 <script type="text/javascript">
     // This file is an example of how to render to the screen
 
+    let timer = 0
+    function update_timer() {
+        timer = timer + 1;
+    }
+
     function test_text() {
         // set text and scale
         const text = "This is example text in the bottom right.";
@@ -98,13 +103,11 @@
         const text = "HELLO WORLD";
         const scale = 3;
 
-        const gt = get_global_timer();
-
         djui_hud_set_resolution(RESOLUTION_DJUI);
         djui_hud_set_font(FONT_NORMAL);
 
         for (let i = 0; i <= 255; i++) {
-            const j = gt / 50;
+            const j = timer / 50;
             let r = Math.sin(0.00 + i / 15 + j) * 127 + 127;
             let g = Math.sin(0.33 + i / 33 + j) * 127 + 127;
             let b = Math.sin(0.66 + i / 77 + j) * 127 + 127;
@@ -124,23 +127,20 @@
         // render to native screen space
         djui_hud_set_resolution(RESOLUTION_DJUI);
 
-        // get SM64 global timer
-        const gt = get_global_timer();
-
         // rotate object around pivot (center)
-        djui_hud_set_rotation(gt * 512, 0.5, 0.5);
+        djui_hud_set_rotation(timer * 512, 0.5, 0.5);
 
         // color and render
         djui_hud_set_color(255, 255, 0, 128);
         djui_hud_render_rect(1280, 512, 64, 64);
 
         // rotate object around pivot (top-left); color and render
-        djui_hud_set_rotation(gt * 512, 0, 0);
+        djui_hud_set_rotation(timer * 512, 0, 0);
         djui_hud_set_color(0, 255, 255, 128);
         djui_hud_render_rect(1280, 512, 64, 64);
 
         // rotate object around pivot (bottom-right); color and render
-        djui_hud_set_rotation(gt * 512, 1, 1);
+        djui_hud_set_rotation(timer * 512, 1, 1);
         djui_hud_set_color(255, 0, 255, 128);
         djui_hud_render_rect(1280, 512, 64, 64);
     }
@@ -216,6 +216,7 @@
 
     // HOOK_ON_HUD_RENDER renders above SM64's hud
     function render_example() {
+        update_timer()
         test_text();
         test_rect();
         test_texture();
@@ -233,7 +234,11 @@
     }
 
     function hud_render() {
-        //render_example()
+        try {
+            render_example()
+        } catch (e) {
+            //console.error("Error rendering DJUI Javascript:", e);
+        }
         djui_hud_set_resolution(RESOLUTION_N64);
         width = djui_hud_get_screen_width();
         height = djui_hud_get_screen_height();
@@ -247,7 +252,10 @@
         djui_hud_print_text_centered("DJUI Javascript", width * 0.5, height * 0.5 - 80, 0.8);
         djui_hud_set_font(FONT_NORMAL);
         djui_hud_print_text_centered("This is a port of DJUI to Javascript", width * 0.5, height * 0.5 - 60, 0.4);
-        djui_hud_render_texture(gTextures.luigi, width * 0.5 - 64, height * 0.5 - 32, 1, 1);
+        djui_hud_render_texture(gTextures.luigi, width * 0.5 - 62, height * 0.5 - 45, 1, 1);
+        djui_hud_render_texture(gTextures.toad, width * 0.5 - 26, height * 0.5 - 45, 1, 1);
+        djui_hud_render_texture(gTextures.waluigi, width * 0.5 + 10, height * 0.5 - 45, 1, 1);
+        djui_hud_render_texture(gTextures.wario, width * 0.5 + 46, height * 0.5 - 45, 1, 1);
     }
 
     hook_event(hud_render);   
