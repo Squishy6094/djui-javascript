@@ -266,7 +266,6 @@ function djui_on_render() {
     canvas.height = window.innerHeight;
     resN64Math = window.innerHeight / 240;
     resDJUIScale = djui_gfx_get_scale();
-    console.log(`DJUI Scale: ${resDJUIScale}`);
     context.clearRect(0, 0, canvas.width, canvas.height);
     try {
         for (const fn of hookedFunctions) {
