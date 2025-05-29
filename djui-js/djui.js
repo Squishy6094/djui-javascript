@@ -127,16 +127,15 @@ function get_mous_pos(e) {
         y: (e.clientY - rect.top)
     };
 }
-
 function djui_hud_apply_link(url) {
-    // Create an invisible clickable box over the canvas area
     const last = renderList[renderList.length - 1];
 
     // Only add the event listener once
     if (!canvas._djui_link_listener) {
         canvas.addEventListener('click', function(e) {
-            for (const box of canvas._djui_link_boxes || []) {
-                const mouse = get_mous_pos(e);
+            const linkBoxes = canvas._djui_link_boxes || [];
+            const mouse = get_mous_pos(e);
+            for (const box of linkBoxes) {
                 if (
                     mouse.x >= box.x &&
                     mouse.x <= box.x + box.width &&
@@ -152,14 +151,27 @@ function djui_hud_apply_link(url) {
         canvas._djui_link_listener = true;
     }
 
-    if (!canvas._djui_link_boxes) {
+    // Prepare the link boxes for this frame if not already
+    if (!canvas._djui_link_boxes_frame || canvas._djui_link_boxes_frame !== djui_on_render._frame) {
         canvas._djui_link_boxes = [];
+        canvas._djui_link_boxes_frame = djui_on_render._frame;
     }
-    // Store the url with the box so it can be opened on click
+
+    // Store the url with the box so it can be opened on click (for this frame only)
     if (last) {
         canvas._djui_link_boxes.push({ ...last, url });
     }
 }
+
+// Increment a frame counter each render to track current frame for link boxes
+const _orig_djui_on_render = djui_on_render;
+djui_on_render._frame = 0;
+djui_on_render = function() {
+    djui_on_render._frame++;
+    canvas._djui_link_boxes = [];
+    canvas._djui_link_boxes_frame = djui_on_render._frame;
+    _orig_djui_on_render();
+};
 
 function djui_hud_render_rect(x, y, width, height) {
     const scale = get_res_scale();
