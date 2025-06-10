@@ -312,6 +312,9 @@
         djui_hud_render_texture(gTextures.wario, width * 0.5 + 46, height * 0.5 - 45 + menuPos, 1, 1);
 
         console.log(djui_hud_get_mouse_x() + " " + djui_hud_get_mouse_y())
+        if (djui_hud_get_mouse_buttons_down()) {
+            djui_hud_set_color(255, 255, 255, 100);
+        }
         djui_hud_render_texture(gTextures.luigi, djui_hud_get_mouse_x(), djui_hud_get_mouse_y(), 1, 1);
     }
 

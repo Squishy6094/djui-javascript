@@ -122,11 +122,21 @@ function restore_rotation() {
 
 let _djui_mouse_x = 0;
 let _djui_mouse_y = 0;
+let _djui_mouse_buttons_down = 0;
+let _djui_mouse_buttons_prev = 0;
 
 canvas.addEventListener('mousemove', function(e) {
     const rect = canvas.getBoundingClientRect();
     _djui_mouse_x = (e.clientX - rect.left) / get_res_scale();
     _djui_mouse_y = (e.clientY - rect.top) / get_res_scale();
+});
+
+canvas.addEventListener('mousedown', function(e) {
+    _djui_mouse_buttons_down |= (1 << e.button);
+});
+
+canvas.addEventListener('mouseup', function(e) {
+    _djui_mouse_buttons_down &= ~(1 << e.button);
 });
 
 function djui_hud_get_mouse_x() {
@@ -137,15 +147,17 @@ function djui_hud_get_mouse_y() {
     return _djui_mouse_y;
 }
 
-// Increment a frame counter each render to track current frame for link boxes
-const _orig_djui_on_render = djui_on_render;
-djui_on_render._frame = 0;
-djui_on_render = function() {
-    djui_on_render._frame++;
-    canvas._djui_link_boxes = [];
-    canvas._djui_link_boxes_frame = djui_on_render._frame;
-    _orig_djui_on_render();
-};
+function djui_hud_get_mouse_buttons_down() {
+    return _djui_mouse_buttons_down;
+}
+
+function djui_hud_get_mouse_buttons_pressed() {
+    return (_djui_mouse_buttons_down & ~_djui_mouse_buttons_prev);
+}
+
+function djui_hud_get_mouse_buttons_released() {
+    return (~_djui_mouse_buttons_down & _djui_mouse_buttons_prev);
+}
 
 function djui_hud_render_rect(x, y, width, height) {
     const scale = get_res_scale();
@@ -265,11 +277,13 @@ function djui_on_render() {
         djui_hud_set_rotation(0, 0, 0);
         const fileName = window.location.pathname.split('/').pop();
         const errorMsg = `'${fileName}' has script errors!`;
-        djui_hud_set_color(0, 0, 0, 255); // Red color for error
+        djui_hud_set_color(0, 0, 0, 255);
         djui_hud_print_text(errorMsg, djui_hud_get_screen_width()*0.5 - djui_hud_measure_text(errorMsg)*0.5 + 1, 31, 1);
-        djui_hud_set_color(255, 0, 0, 255); // Red color for error
+        djui_hud_set_color(255, 0, 0, 255);
         djui_hud_print_text(errorMsg, djui_hud_get_screen_width()*0.5 - djui_hud_measure_text(errorMsg)*0.5, 30, 1);
         throw new Error(error + " Line: " + error.lineNumber + " in " + fileName);
     }
+    canvas._djui_link_boxes = [];
+    _djui_mouse_buttons_prev = _djui_mouse_buttons_down;
 }
 setInterval(djui_on_render, 1000 / 30); // Update 30 times a second
