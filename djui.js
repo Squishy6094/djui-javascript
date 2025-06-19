@@ -79,64 +79,86 @@ function djui_hud_get_screen_height() {
 }
 
 function djui_hud_set_color(r, g, b, a) {
-    // Clamp alpha to [0, 1] if it's in [0, 255]
     a = a / 255;
     context.globalAlpha = a;
     context.fillStyle = `rgb(${r}, ${g}, ${b})`;
 }
 
+const renderList = [];
 
 let currentRotation = 0;
 let currentPivotX = 0;
 let currentPivotY = 0;
 
 function djui_hud_set_rotation(rotation, pivotX, pivotY) {
-    // Convert 16-bit integer to degrees
     currentRotation = (-rotation / 0x10000) * 360;
     currentPivotX = pivotX;
     currentPivotY = pivotY;
 }
-const renderList = [];
 
-function add_to_render_list(x, y, width, height) {
-    renderList.push({ x, y, width, height });
-}
-function apply_current_rotation() {
-    if (renderList.length > 0) {
-        const last = renderList[renderList.length - 1];
-        if (last) {
-            let pivotX = last.x + last.width * currentPivotX;
-            let pivotY = last.y + last.height * currentPivotY;
-            context.save();
-            context.translate(pivotX, pivotY);
-            context.rotate(currentRotation * Math.PI / 180); // Convert degrees to radians
-            context.translate(-pivotX, -pivotY);
-        }
-    }
+function apply_rotation_context(x, y, width, height) {
+    const pivotX = x + width * currentPivotX;
+    const pivotY = y + height * currentPivotY;
+    context.translate(pivotX, pivotY);
+    context.rotate(currentRotation * Math.PI / 180);
+    context.translate(-pivotX, -pivotY);
 }
 
-// Restore context after drawing each object
-function restore_rotation() {
-    context.restore();
-}
+let MOUSE_BUTTON_1 = (1 << 0)
+let MOUSE_BUTTON_2 = (1 << 1)
+let MOUSE_BUTTON_3 = (1 << 2)
+let MOUSE_BUTTON_4 = (1 << 3)
+let MOUSE_BUTTON_5 = (1 << 4)
+
+let L_MOUSE_BUTTON = MOUSE_BUTTON_1
+let M_MOUSE_BUTTON = MOUSE_BUTTON_2
+let R_MOUSE_BUTTON = MOUSE_BUTTON_3
 
 let _djui_mouse_x = 0;
 let _djui_mouse_y = 0;
 let _djui_mouse_buttons_down = 0;
 let _djui_mouse_buttons_prev = 0;
 
-canvas.addEventListener('mousemove', function(e) {
+canvas.addEventListener('mousemove', function (e) {
     const rect = canvas.getBoundingClientRect();
     _djui_mouse_x = (e.clientX - rect.left) / get_res_scale();
     _djui_mouse_y = (e.clientY - rect.top) / get_res_scale();
 });
 
-canvas.addEventListener('mousedown', function(e) {
+canvas.addEventListener('mousedown', function (e) {
     _djui_mouse_buttons_down |= (1 << e.button);
 });
 
-canvas.addEventListener('mouseup', function(e) {
+canvas.addEventListener('mouseup', function (e) {
     _djui_mouse_buttons_down &= ~(1 << e.button);
+});
+window.addEventListener('mouseout', (e) => {
+    _djui_mouse_buttons_down &= ~(1 << e.button);
+});
+
+// Mobile "Mouse" Support
+canvas.addEventListener('touchmove', function (e) {
+    const rect = canvas.getBoundingClientRect();
+    const touch = e.touches[0]; // Use the first touch point
+
+    _djui_mouse_x = (touch.clientX - rect.left) / get_res_scale();
+    _djui_mouse_y = (touch.clientY - rect.top) / get_res_scale();
+
+    //e.preventDefault(); // Prevent scrolling or pinch-zoom
+}, { passive: false }); // Needed to allow preventDefault()
+
+canvas.addEventListener('touchstart', function (e) {
+    _djui_mouse_buttons_down |= (1 << 0);
+    //e.preventDefault(); // Prevent mouse emulation
+});
+
+canvas.addEventListener('touchend', function (e) {
+    _djui_mouse_buttons_down &= ~(1 << 0);
+    //e.preventDefault(); // Prevent mouse emulation
+});
+canvas.addEventListener('touchcancel', function (e) {
+    _djui_mouse_buttons_down &= ~(1 << 0);
+    //e.preventDefault(); // Prevent mouse emulation
 });
 
 function djui_hud_get_mouse_x() {
@@ -161,10 +183,14 @@ function djui_hud_get_mouse_buttons_released() {
 
 function djui_hud_render_rect(x, y, width, height) {
     const scale = get_res_scale();
-    add_to_render_list(x * scale, y * scale, width * scale, height * scale);
-    apply_current_rotation();
-    context.fillRect(x * scale, y * scale, width * scale, height * scale);
-    restore_rotation();
+    const sx = x * scale;
+    const sy = y * scale;
+    const sw = width * scale;
+    const sh = height * scale;
+    context.save();
+    apply_rotation_context(sx, sy, sw, sh);
+    context.fillRect(sx, sy, sw, sh);
+    context.restore();
 }
 
 const fontStyles = document.createElement('style');
@@ -208,49 +234,51 @@ function djui_hud_print_text(text, x, y, scale) {
 
 function get_texture_info(texName) {
     const img = new Image();
-    img.src = texName;
+    img.src = texName
     return img;
 }
 
 const gTextures = {
-    // mario: get_texture_info('djui-js/mario.png'),
     luigi: get_texture_info('djui-js/luigi.png'),
     toad: get_texture_info('djui-js/toad.png'),
     waluigi: get_texture_info('djui-js/waluigi.png'),
     wario: get_texture_info('djui-js/wario.png'),
 };
-function djui_hud_render_texture(texture, x, y, width, height) {
-    const scale = get_res_scale();
-    const imgWidth = width * texture.naturalWidth;
-    const imgHeight = height * texture.naturalHeight;
-    add_to_render_list(x * scale, y * scale, imgWidth * scale, imgHeight * scale);
-    apply_current_rotation();
-    if (texture instanceof HTMLImageElement) {
-        context.imageSmoothingEnabled = false;
-        context.drawImage(texture, x * scale, y * scale, imgWidth * scale, imgHeight * scale);
-    } else {
-        console.warn(`Texture '${texture}' not found.`);
+
+function djui_hud_render_texture(texture, x, y, scaleX, scaleY) {
+    if (!(texture instanceof HTMLImageElement) || !texture.complete || texture.width === 0) {
+        console.log(":p");
+        return;
     }
-    restore_rotation();
+
+    const scale = get_res_scale();
+    const drawX = x * scale;
+    const drawY = y * scale;
+    const drawW = texture.width * scaleX * scale;
+    const drawH = texture.height * scaleY * scale;
+
+    context.save();
+    apply_rotation_context(drawX, drawY, drawW, drawH);
+    context.imageSmoothingEnabled = false;
+    context.drawImage(texture, drawX, drawY, drawW, drawH);
+    context.restore();
 }
 
+
+
 function djui_hud_render_texture_tile(texture, x, y, width, height, tileX, tileY, tileWidth, tileHeight) {
-    const imgWidth = (width * tileWidth * tileWidth / texture.naturalWidth);
-    const imgHeight = (height * tileHeight * tileHeight / texture.naturalHeight);
     const scale = get_res_scale();
-    add_to_render_list(x * scale, y * scale, imgWidth * scale, imgHeight * scale);
-    apply_current_rotation();
+    const sx = x * scale;
+    const sy = y * scale;
+    const sw = width * tileWidth * tileWidth / texture.width;
+    const sh = height * tileHeight * tileHeight / texture.height;
+    context.save();
+    apply_rotation_context(sx, sy, sw, sh);
     if (texture instanceof HTMLImageElement) {
         context.imageSmoothingEnabled = false;
-        context.drawImage(
-            texture,
-            tileX, tileY, tileWidth, tileHeight,
-            x * scale, y * scale, imgWidth * scale, imgHeight * scale
-        );
-    } else {
-        console.warn(`Texture '${texture}' not found.`);
+        context.drawImage(texture, tileX, tileY, tileWidth, tileHeight, sx, sy, sw * scale, sh * scale);
     }
-    restore_rotation();
+    context.restore();
 }
 
 const hookedFunctions = [];
@@ -262,8 +290,12 @@ function hook_event(func) {
 
 function djui_on_render() {
     renderList.length = 0;
+    // Set Canvas size accordingly
+    canvas.style.width = `${window.innerWidth}px`;
+    canvas.style.height = `${window.innerHeight}px`;
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
+
     resN64Math = window.innerHeight / 240;
     resDJUIScale = djui_gfx_get_scale();
     context.clearRect(0, 0, canvas.width, canvas.height);
