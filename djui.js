@@ -264,20 +264,26 @@ function djui_hud_render_texture(texture, x, y, scaleX, scaleY) {
     context.restore();
 }
 
-
-
-function djui_hud_render_texture_tile(texture, x, y, width, height, tileX, tileY, tileWidth, tileHeight) {
-    const scale = get_res_scale();
-    const sx = x * scale;
-    const sy = y * scale;
-    const sw = width * tileWidth * tileWidth / texture.width;
-    const sh = height * tileHeight * tileHeight / texture.height;
-    context.save();
-    apply_rotation_context(sx, sy, sw, sh);
-    if (texture instanceof HTMLImageElement) {
-        context.imageSmoothingEnabled = false;
-        context.drawImage(texture, tileX, tileY, tileWidth, tileHeight, sx, sy, sw * scale, sh * scale);
+function djui_hud_render_texture_tile(texture, x, y, scaleX, scaleY, tileX, tileY, tileWidth, tileHeight) {
+    if (!(texture instanceof HTMLImageElement) || !texture.complete || texture.naturalWidth === 0) {
+        console.log(">:p");
+        return;
     }
+
+    const scale = get_res_scale();
+    const drawX = x * scale;
+    const drawY = y * scale;
+    const drawW = tileWidth * scaleX * scale;
+    const drawH = tileHeight * scaleY * scale;
+
+    context.save();
+    apply_rotation_context(drawX, drawY, drawW, drawH);
+    context.imageSmoothingEnabled = false;
+    context.drawImage(
+        texture,
+        tileX, tileY, tileWidth, tileHeight, // source crop rectangle
+        drawX, drawY, drawW, drawH           // destination on canvas
+    );
     context.restore();
 }
 
