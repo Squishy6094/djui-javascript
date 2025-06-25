@@ -305,6 +305,7 @@ function djui_on_render() {
     resN64Math = window.innerHeight / 240;
     resDJUIScale = djui_gfx_get_scale();
     context.clearRect(0, 0, canvas.width, canvas.height);
+    context.beginPath()
     try {
         for (const fn of hookedFunctions) {
             fn();
