@@ -232,7 +232,7 @@ function djui_hud_print_text(text, x, y, scale) {
     context.fillText(text, x * resScale, y * resScale);
 }
 
-function get_texture_info(texName) {
+async function get_texture_info(texName) {
     const img = new Image();
     img.src = texName
     return img;
