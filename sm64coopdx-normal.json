@@ -1,0 +1,58 @@
+{
+	"$baseURI": "https://yal.cc/r/20/pixelfont/",
+	"$version": "1.0",
+	"in-glyphs": [
+		"!\"#$%&'()*+,-./0123456789:;<=>?@",
+		"ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`",
+		"abcdefghijklmnopqrstuvwxyz{|}~∎"
+	],
+	"glyph-color": "white",
+	"glyph-width": 8,
+	"glyph-height": 16,
+	"glyph-ofs-x": 0,
+	"glyph-ofs-y": 0,
+	"glyph-sep-x": 0,
+	"glyph-sep-y": 0,
+	"glyph-base-x": 0,
+	"glyph-baseline": 13,
+	"glyph-spacing": 1,
+	"font-is-mono": false,
+	"font-em-square": 2048,
+	"font-line-gap": 512,
+	"font-ascend": 1280,
+	"font-descend": -256,
+	"font-px-size": 128,
+	"contour-type": "smart",
+	"font-type": "ttf",
+	"font-is-upper": false,
+	"font-name": "sm64coopdx-normal",
+	"font-author": "Squishy6094",
+	"font-copy": "(c)",
+	"font-version-major": 0,
+	"font-version-minor": 0,
+	"font-desc": "SM64CoopDX",
+	"font-license": "You have the permission",
+	"font-license-url": "",
+	"font-sample-text": [
+		"Princess Toadstool's ",
+		"castle is just ahead."
+	],
+	"font-embedding": "4",
+	"font-weight-class": "400",
+	"font-width-class": "5",
+	"font-creation-date": "2025-07-13",
+	"font-creation-time": "16:27",
+	"font-modification-date": "2025-07-13",
+	"font-modification-time": "17:11",
+	"font-modification-auto": true,
+	"overrides": [
+		"# hide the pixels of the \"space\" characters!",
+		"# (but they'll still have a width)",
+		"hide \\s",
+		"default_char x"
+	],
+	"font-preview-text": [
+		"Princess Toadstool's ",
+		"castle is just ahead."
+	]
+}

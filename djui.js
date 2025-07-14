@@ -197,21 +197,21 @@ const fontStyles = document.createElement('style');
 const FONT_NORMAL = 1;
 const FONT_ALIASED = 2;
 fontStyles.textContent = `
-@font-face {font-family: FONT_NORMAL; src: url('djui-js/sm64coopdx-normal-font.ttf') format('truetype'); font-weight: normal; font-style: normal;}
-@font-face {font-family: FONT_ALIASED; src: url('djui-js/sm64coopdx-aliased-font.ttf') format('truetype'); font-weight: normal; font-style: normal;}
+@font-face {font-family: FONT_NORMAL; src: url('djui-js/sm64coopdx-normal.ttf') format('truetype'); font-weight: normal; font-style: normal;}
+@font-face {font-family: FONT_ALIASED; src: url('djui-js/sm64coopdx-aliased.ttf') format('truetype'); font-weight: normal; font-style: normal;}
 `;
 document.head.appendChild(fontStyles);
 
 context.font = '24px FONT_NORMAL';
 currentFont = 'FONT_NORMAL'
-currentFontSize = 24;
+currentFontSize = 32;
 function djui_hud_set_font(font) {
     if (font === FONT_NORMAL) {
         currentFont = 'FONT_NORMAL';
-        currentFontSize = 24;
+        currentFontSize = 32;
     } else if (font === FONT_ALIASED) {
         currentFont = 'FONT_ALIASED';
-        currentFontSize = 24;
+        currentFontSize = 32;
     }
 }
 function djui_hud_measure_text(text) {
@@ -305,7 +305,6 @@ function djui_on_render() {
     resN64Math = window.innerHeight / 240;
     resDJUIScale = djui_gfx_get_scale();
     context.clearRect(0, 0, canvas.width, canvas.height);
-    context.beginPath()
     try {
         for (const fn of hookedFunctions) {
             fn();
