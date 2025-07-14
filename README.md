@@ -17,7 +17,7 @@ git submodule add https://github.com/Squishy6094/djui-javascript djui-js
 ```
 4. (Optional) To update DJUI Javascript, you can use the following command to update to the latest commit
 ```cmd
-git submodule update --init --recursive
+git submodule foreach git pull origin main
 ```
 
 And you're done! You should now be able to access the DJUI Functions avalible in SM64CoopDX directly in Javascript
