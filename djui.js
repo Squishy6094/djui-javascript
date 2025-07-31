@@ -313,15 +313,20 @@ function djui_on_render() {
         djui_hud_set_resolution(RESOLUTION_DJUI);
         djui_hud_set_font(FONT_NORMAL);
         djui_hud_set_rotation(0, 0, 0);
+        
         const fileName = window.location.pathname.split('/').pop();
         const errorMsg = `'${fileName}' has script errors!`;
+        
         djui_hud_set_color(0, 0, 0, 255);
-        djui_hud_print_text(errorMsg, djui_hud_get_screen_width()*0.5 - djui_hud_measure_text(errorMsg)*0.5 + 1, 31, 1);
+        djui_hud_print_text(errorMsg, djui_hud_get_screen_width() * 0.5 - djui_hud_measure_text(errorMsg) * 0.5 + 1, 31, 1);
         djui_hud_set_color(255, 0, 0, 255);
-        djui_hud_print_text(errorMsg, djui_hud_get_screen_width()*0.5 - djui_hud_measure_text(errorMsg)*0.5, 30, 1);
-        throw new Error(error + " Line: " + error.lineNumber + " in " + fileName);
+        djui_hud_print_text(errorMsg, djui_hud_get_screen_width() * 0.5 - djui_hud_measure_text(errorMsg) * 0.5, 30, 1);
+
+        const formattedError = new Error(
+            `${error.message || error} in ${fileName}\nStack trace:\n${error.stack || 'No stack available'}`
+        );
+        throw formattedError;
     }
-    canvas._djui_link_boxes = [];
     _djui_mouse_buttons_prev = _djui_mouse_buttons_down;
 }
 setInterval(djui_on_render, 1000 / 30); // Update 30 times a second
