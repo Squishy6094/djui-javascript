@@ -1,3 +1,11 @@
+// DJUI Customization //
+
+// The FPS that DJUI runs at, Default is 30, set to 0 for uncapped
+const DJUIJS_FPS = 30
+
+// Sacrifices Accuracy for better mobile support with RESOLUTION_N64
+const DJUIJS_SAFE_N64 = true
+
 // Set up canvas for rendering
 if (!document.body) {
     document.documentElement.appendChild(document.createElement('body'));
@@ -67,14 +75,22 @@ function djui_hud_set_resolution(res) {
 }
 
 function djui_hud_get_screen_width() {
-    return canvas.width / get_res_scale();
+    if (currentResolution === RESOLUTION_DJUI || !DJUIJS_SAFE_N64) {
+        return canvas.width / get_res_scale();
+    } else {
+        return canvas.width / get_res_scale();
+    }
 }
 
 function djui_hud_get_screen_height() {
     if (currentResolution === RESOLUTION_DJUI) {
         return canvas.height / resDJUIScale;
     } else if (currentResolution === RESOLUTION_N64) {
-        return 240; // N64 height is always 240 pixels
+        if (!DJUIJS_SAFE_N64) {
+            return 240; // N64 height is always 240 pixels
+        } else {
+            return canvas.height / get_res_scale()
+        }
     }
 }
 
@@ -247,7 +263,6 @@ const gTextures = {
 
 function djui_hud_render_texture(texture, x, y, scaleX, scaleY) {
     if (!(texture instanceof HTMLImageElement) || !texture.complete || texture.width === 0) {
-        console.log(":p");
         return;
     }
 
@@ -266,7 +281,6 @@ function djui_hud_render_texture(texture, x, y, scaleX, scaleY) {
 
 function djui_hud_render_texture_tile(texture, x, y, scaleX, scaleY, tileX, tileY, tileWidth, tileHeight) {
     if (!(texture instanceof HTMLImageElement) || !texture.complete || texture.naturalWidth === 0) {
-        console.log(">:p");
         return;
     }
 
@@ -294,39 +308,60 @@ function hook_event(func) {
     }
 }
 
+let lastError = ""
+let lastErrorTimer = 0
 function djui_on_render() {
     renderList.length = 0;
-    // Set Canvas size accordingly
-    canvas.style.width = `${window.innerWidth}px`;
-    canvas.style.height = `${window.innerHeight}px`;
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
 
-    resN64Math = window.innerHeight / 240;
+    if (canvas.width !== window.innerWidth || canvas.height !== window.innerHeight) {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        canvas.style.width = `${window.innerWidth}px`;
+        canvas.style.height = `${window.innerHeight}px`;
+    }
+
+    if (!DJUIJS_SAFE_N64) {
+        resN64Math = window.innerHeight / 240;
+    } else {
+        resN64Math = Math.min(window.innerHeight / 240, window.innerWidth / 320);
+    }
     resDJUIScale = djui_gfx_get_scale();
     context.clearRect(0, 0, canvas.width, canvas.height);
-    try {
-        for (const fn of hookedFunctions) {
+    for (const fn of hookedFunctions) {
+        //if (fn._errored) continue;
+        try {
             fn();
+        } catch (error) {
+            fn._errored = true;
+            lastErrorTimer = 150;
+            // Only log the useful part
+            console.error(`${error.message} (${error.fileName || "unknown file"}:${error.lineNumber || "?"})`);
         }
-    } catch (error) {
+    }
+
+
+    if (lastErrorTimer > 0) {
         djui_hud_set_resolution(RESOLUTION_DJUI);
         djui_hud_set_font(FONT_NORMAL);
         djui_hud_set_rotation(0, 0, 0);
-        
-        const fileName = window.location.pathname.split('/').pop();
-        const errorMsg = `'${fileName}' has script errors!`;
-        
-        djui_hud_set_color(0, 0, 0, 255);
-        djui_hud_print_text(errorMsg, djui_hud_get_screen_width() * 0.5 - djui_hud_measure_text(errorMsg) * 0.5 + 1, 31, 1);
-        djui_hud_set_color(255, 0, 0, 255);
-        djui_hud_print_text(errorMsg, djui_hud_get_screen_width() * 0.5 - djui_hud_measure_text(errorMsg) * 0.5, 30, 1);
 
-        const formattedError = new Error(
-            `${error.message || error} in ${fileName}\nStack trace:\n${error.stack || 'No stack available'}`
-        );
-        throw formattedError;
+        const error = `'${document.title}' has script errors!`
+        djui_hud_set_color(0, 0, 0, 255);
+        djui_hud_print_text(error, djui_hud_get_screen_width() * 0.5 - djui_hud_measure_text(error) * 0.5 + 1, 31, 1);
+        djui_hud_set_color(255, 0, 0, 255);
+        djui_hud_print_text(error, djui_hud_get_screen_width() * 0.5 - djui_hud_measure_text(error) * 0.5, 30, 1);
+
+        lastErrorTimer = lastErrorTimer - 1
     }
     _djui_mouse_buttons_prev = _djui_mouse_buttons_down;
 }
-setInterval(djui_on_render, 1000 / 30); // Update 30 times a second
+
+let lastFrameTime = 0;
+function renderLoop(timestamp) {
+    if (!DJUIJS_FPS || timestamp - lastFrameTime >= 1000/DJUIJS_FPS) {
+        lastFrameTime = timestamp;
+        djui_on_render();
+    }
+    requestAnimationFrame(renderLoop);
+}
+requestAnimationFrame(renderLoop);
