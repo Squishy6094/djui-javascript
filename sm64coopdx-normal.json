@@ -26,6 +26,7 @@
 	"font-type": "ttf",
 	"font-is-upper": false,
 	"font-name": "sm64coopdx-normal",
+	"font-style": "Regular",
 	"font-author": "Squishy6094",
 	"font-copy": "(c)",
 	"font-version-major": 0,
@@ -42,14 +43,15 @@
 	"font-width-class": "5",
 	"font-creation-date": "2025-07-13",
 	"font-creation-time": "16:27",
-	"font-modification-date": "2025-07-13",
-	"font-modification-time": "17:11",
+	"font-modification-date": "2025-08-26",
+	"font-modification-time": "00:41",
 	"font-modification-auto": true,
 	"overrides": [
 		"# hide the pixels of the \"space\" characters!",
 		"# (but they'll still have a width)",
 		"hide \\s",
-		"default_char x"
+		"default_char x",
+		"left \\s 1"
 	],
 	"font-preview-text": [
 		"Princess Toadstool's ",
