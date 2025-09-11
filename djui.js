@@ -308,17 +308,21 @@ function hook_event(func) {
     }
 }
 
-let lastError = ""
-let lastErrorTimer = 0
-function djui_on_render() {
-    renderList.length = 0;
-
-    if (canvas.width !== window.innerWidth || canvas.height !== window.innerHeight) {
+let resizeTimer;
+window.addEventListener("resize", () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
         canvas.style.width = `${window.innerWidth}px`;
         canvas.style.height = `${window.innerHeight}px`;
-    }
+    }, 100); // only resize after 100ms of no resize
+});
+
+let lastError = ""
+let lastErrorTimer = 0
+function djui_on_render() {
+    renderList.length = 0;
 
     if (!DJUIJS_SAFE_N64) {
         resN64Math = window.innerHeight / 240;
