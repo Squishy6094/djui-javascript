@@ -135,6 +135,7 @@ let _djui_mouse_y = 0;
 let _djui_mouse_buttons_down = 0;
 let _djui_mouse_buttons_prev = 0;
 
+// Mouse Listener
 canvas.addEventListener('mousemove', function (e) {
     const rect = canvas.getBoundingClientRect();
     _djui_mouse_x = (e.clientX - rect.left) / get_res_scale();
@@ -153,29 +154,36 @@ window.addEventListener('mouseout', (e) => {
 });
 
 // Mobile "Mouse" Support
-canvas.addEventListener('touchmove', function (e) {
+function update_touch_pos(e) {
     const rect = canvas.getBoundingClientRect();
-    const touch = e.touches[0]; // Use the first touch point
+    const touch = e.touches[0] || e.changedTouches[0]; // fall back if no active touches
 
-    _djui_mouse_x = (touch.clientX - rect.left) / get_res_scale();
-    _djui_mouse_y = (touch.clientY - rect.top) / get_res_scale();
+    if (touch) {
+        _djui_mouse_x = (touch.clientX - rect.left) / get_res_scale();
+        _djui_mouse_y = (touch.clientY - rect.top) / get_res_scale();
+    }
 
-    //e.preventDefault(); // Prevent scrolling or pinch-zoom
-}, { passive: false }); // Needed to allow preventDefault()
+    e.preventDefault(); // Prevent scrolling & mouse emulation
+}
 
 canvas.addEventListener('touchstart', function (e) {
+    update_touch_pos(e);
     _djui_mouse_buttons_down |= (1 << 0);
-    //e.preventDefault(); // Prevent mouse emulation
-});
+}, { passive: false });
+
+canvas.addEventListener('touchmove', function (e) {
+    update_touch_pos(e);
+}, { passive: false });
 
 canvas.addEventListener('touchend', function (e) {
+    update_touch_pos(e);
     _djui_mouse_buttons_down &= ~(1 << 0);
-    //e.preventDefault(); // Prevent mouse emulation
-});
+}, { passive: false });
+
 canvas.addEventListener('touchcancel', function (e) {
     _djui_mouse_buttons_down &= ~(1 << 0);
-    //e.preventDefault(); // Prevent mouse emulation
-});
+}, { passive: false });
+
 
 function djui_hud_get_mouse_x() {
     return _djui_mouse_x;
