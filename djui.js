@@ -332,7 +332,6 @@ function djui_on_render() {
     resDJUIScale = djui_gfx_get_scale();
     context.clearRect(0, 0, canvas.width, canvas.height);
     for (const fn of hookedFunctions) {
-        //if (fn._errored) continue;
         try {
             fn();
         } catch (error) {
@@ -359,13 +358,4 @@ function djui_on_render() {
     }
     _djui_mouse_buttons_prev = _djui_mouse_buttons_down;
 }
-
-let lastFrameTime = 0;
-function renderLoop(timestamp) {
-    if (!DJUIJS_FPS || timestamp - lastFrameTime >= 1000/DJUIJS_FPS) {
-        lastFrameTime = timestamp;
-        djui_on_render();
-    }
-    requestAnimationFrame(renderLoop);
-}
-requestAnimationFrame(renderLoop);
+setInterval(djui_on_render, 1000/DJUIJS_FPS)
