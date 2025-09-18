@@ -67,12 +67,28 @@ function get_res_scale() {
     return 1;
 }
 
+function update_canvas_size() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    canvas.style.width = `${window.innerWidth}px`;
+    canvas.style.height = `${window.innerHeight}px`;
+
+    if (!DJUIJS_SAFE_N64) {
+        resN64Math = window.innerHeight / 240;
+    } else {
+        resN64Math = Math.min(window.innerHeight / 240, window.innerWidth / 320);
+    }
+    resDJUIScale = djui_gfx_get_scale();
+}
+
 function djui_hud_set_resolution(res) {
     if (res !== RESOLUTION_DJUI && res !== RESOLUTION_N64) {
         throw new Error('Invalid resolution: must be RESOLUTION_DJUI or RESOLUTION_N64');
     }
     currentResolution = res;
 }
+
+update_canvas_size()
 
 function djui_hud_get_screen_width() {
     if (currentResolution === RESOLUTION_DJUI || !DJUIJS_SAFE_N64) {
@@ -316,28 +332,13 @@ function hook_event(func) {
     }
 }
 
-let resizeTimer;
-window.addEventListener("resize", () => {
-    clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(() => {
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-        canvas.style.width = `${window.innerWidth}px`;
-        canvas.style.height = `${window.innerHeight}px`;
-    }, 100); // only resize after 100ms of no resize
-});
-
 let lastError = ""
 let lastErrorTimer = 0
 function djui_on_render() {
     renderList.length = 0;
 
-    if (!DJUIJS_SAFE_N64) {
-        resN64Math = window.innerHeight / 240;
-    } else {
-        resN64Math = Math.min(window.innerHeight / 240, window.innerWidth / 320);
-    }
-    resDJUIScale = djui_gfx_get_scale();
+    update_canvas_size()
+
     context.clearRect(0, 0, canvas.width, canvas.height);
     for (const fn of hookedFunctions) {
         try {
