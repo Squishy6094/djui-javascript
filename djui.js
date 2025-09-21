@@ -28,6 +28,11 @@ const context = canvas.getContext('2d');
 
 // The real stuffs
 
+let djuiGlobalTimer = 0
+function get_global_timer() {
+    return djuiGlobalTimer
+}
+
 const RESOLUTION_DJUI = 1;
 const RESOLUTION_N64 = 2;
 let currentResolution = RESOLUTION_DJUI;
@@ -86,6 +91,11 @@ function djui_hud_set_resolution(res) {
         throw new Error('Invalid resolution: must be RESOLUTION_DJUI or RESOLUTION_N64');
     }
     currentResolution = res;
+    djui_update_mouse_scale()
+}
+
+function djui_hud_get_resolution() {
+    return currentResolution
 }
 
 update_canvas_size()
@@ -146,16 +156,25 @@ let L_MOUSE_BUTTON = MOUSE_BUTTON_1
 let M_MOUSE_BUTTON = MOUSE_BUTTON_2
 let R_MOUSE_BUTTON = MOUSE_BUTTON_3
 
+let _source_mouse_x = 0;
+let _source_mouse_y = 0;
 let _djui_mouse_x = 0;
 let _djui_mouse_y = 0;
 let _djui_mouse_buttons_down = 0;
 let _djui_mouse_buttons_prev = 0;
 
 // Mouse Listener
+function djui_update_mouse_scale(e) {
+    _djui_mouse_x = (_source_mouse_x) / get_res_scale();
+    _djui_mouse_y = (_source_mouse_y) / get_res_scale();
+};
+
+
 canvas.addEventListener('mousemove', function (e) {
     const rect = canvas.getBoundingClientRect();
-    _djui_mouse_x = (e.clientX - rect.left) / get_res_scale();
-    _djui_mouse_y = (e.clientY - rect.top) / get_res_scale();
+    _source_mouse_x = e.clientX - rect.left
+    _source_mouse_y = e.clientY - rect.top
+    djui_update_mouse_scale(e)
 });
 
 canvas.addEventListener('mousedown', function (e) {
@@ -325,6 +344,82 @@ function djui_hud_render_texture_tile(texture, x, y, scaleX, scaleY, tileX, tile
     context.restore();
 }
 
+// DJUI Popups
+let DjuiPopup = []
+let sPopupListY = 4
+const DJUI_POPUP_LIFETIME = 180
+
+function djui_hud_popup_create(message, lines) {
+    // Log just in case
+    console.log(message)
+    
+    let height = lines * 32 + 32
+    let split = message.split("\n")
+    DjuiPopup.push({
+        text: split,
+        lines: lines,
+        createTime: get_global_timer(),
+        height: height,
+        x: 8,
+        y: -height,
+        alpha: 1.0,
+    })
+
+    sPopupListY -= height + 4
+    // play_sound(SOUND_MENU_PINCH_MARIO_FACE, gGlobalSoundSource);
+}
+
+function djui_popup_update() {
+    let y = sPopupListY + 4
+    let screenWidth = djui_hud_get_screen_width()
+
+    for (let i = (DjuiPopup.length - 1); i >= 0; ) {
+        let node = DjuiPopup[i]
+        if (node == null) {
+            i--
+            continue
+        }
+        node.y = y
+        y += node.height + 14
+
+        let elapsed = get_global_timer() - node.createTime
+
+        // fade out
+        let alpha = Math.min(Math.max((DJUI_POPUP_LIFETIME - elapsed)/30, 0), 1)
+        alpha *= alpha
+        if (elapsed > DJUI_POPUP_LIFETIME) alpha = 0
+
+        // Render Boarder (Thanks DJUI)
+        djui_hud_set_color(0, 0, 0, 180 * alpha)
+        djui_hud_render_rect(screenWidth - 404 - node.x, node.y, 4, node.height)
+        djui_hud_render_rect(screenWidth - node.x, node.y, 4, node.height)
+        djui_hud_render_rect(screenWidth - 404 - node.x, node.y - 4, 408, 4)
+        djui_hud_render_rect(screenWidth - 404 - node.x, node.y + node.height, 408, 4)
+        // Render BG
+        djui_hud_set_color(0, 0, 0, 220 * alpha)
+        djui_hud_render_rect(screenWidth - 400 - node.x, node.y, 400, node.height)
+        // Render Text
+        djui_hud_set_font(FONT_NORMAL);
+        djui_hud_set_color(255, 255, 255, 255 * alpha)
+        for (let text of node.text) {
+            let height = node.height*0.5 - (node.text.length)*15 + node.text.indexOf(text)*30
+            djui_hud_print_text(text, screenWidth - 200 - djui_hud_measure_text(text)*0.5 - node.x, node.y + height, 1)
+        }
+        
+        // remove popup if fully faded
+        if (alpha === 0) {
+            DjuiPopup.splice(i, 1)
+            continue
+        }
+
+        i--
+    }
+
+    // move entire popup list toward 4
+    sPopupListY = sPopupListY * 0.75 + 1
+    if (sPopupListY > 8) sPopupListY = 8
+}
+
 const hookedFunctions = [];
 function hook_event(func) {
     if (typeof func === 'function') {
@@ -336,7 +431,6 @@ let lastError = ""
 let lastErrorTimer = 0
 function djui_on_render() {
     renderList.length = 0;
-
     update_canvas_size()
 
     context.clearRect(0, 0, canvas.width, canvas.height);
@@ -350,10 +444,10 @@ function djui_on_render() {
             console.error(`${error.message} (${error.fileName || "unknown file"}:${error.lineNumber || "?"})`);
         }
     }
-
+    
+    djui_hud_set_resolution(RESOLUTION_DJUI);
 
     if (lastErrorTimer > 0) {
-        djui_hud_set_resolution(RESOLUTION_DJUI);
         djui_hud_set_font(FONT_NORMAL);
         djui_hud_set_rotation(0, 0, 0);
 
@@ -366,5 +460,9 @@ function djui_on_render() {
         lastErrorTimer = lastErrorTimer - 1
     }
     _djui_mouse_buttons_prev = _djui_mouse_buttons_down;
+
+    djui_popup_update()
+
+    djuiGlobalTimer++
 }
 setInterval(djui_on_render, 1000/DJUIJS_FPS)
