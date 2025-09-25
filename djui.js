@@ -12,6 +12,9 @@ if (!document.body) {
 }
 
 const canvas = document.createElement('canvas');
+canvas.style.touchAction = "none"; // Don't let the browser eat touches
+
+document.body.appendChild(canvas);
 
 canvas.id = 'myCanvas';
 canvas.style.position = 'fixed';
@@ -191,20 +194,22 @@ window.addEventListener('mouseout', (e) => {
 // Mobile "Mouse" Support
 function update_touch_pos(e) {
     const rect = canvas.getBoundingClientRect();
-    const touch = e.touches[0] || e.changedTouches[0]; // fall back if no active touches
+    const touch = e.touches[0] || e.changedTouches[0];
 
     if (touch) {
-        _djui_mouse_x = (touch.clientX - rect.left) / get_res_scale();
-        _djui_mouse_y = (touch.clientY - rect.top) / get_res_scale();
+        _source_mouse_x = touch.clientX - rect.left;
+        _source_mouse_y = touch.clientY - rect.top;
     }
 
-    e.preventDefault(); // Prevent scrolling & mouse emulation
+    e.preventDefault();
+    djui_update_mouse_scale(e);
 }
 
 canvas.addEventListener('touchstart', function (e) {
     update_touch_pos(e);
     _djui_mouse_buttons_down |= (1 << 0);
 }, { passive: false });
+
 
 canvas.addEventListener('touchmove', function (e) {
     update_touch_pos(e);
