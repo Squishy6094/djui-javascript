@@ -1,473 +1,626 @@
-// DJUI Customization //
+// Configurable Options
+const DJUI_CONFIG_FPS = 30
 
-// The FPS that DJUI runs at, Default is 30, set to 0 for uncapped
-const DJUIJS_FPS = 30
-
-// Sacrifices Accuracy for better mobile support with RESOLUTION_N64
-const DJUIJS_SAFE_N64 = true
-
-// Set up canvas for rendering
-if (!document.body) {
-    document.documentElement.appendChild(document.createElement('body'));
-}
-
-const canvas = document.createElement('canvas');
-canvas.style.touchAction = "none"; // Don't let the browser eat touches
-
+// Create canvas
+const canvas = document.createElement("canvas");
 document.body.appendChild(canvas);
+document.body.style.margin = "0";
+document.body.style.overflow = "hidden";
+canvas.style.position = "fixed";
+canvas.style.left = "0";
+canvas.style.top = "0";
+canvas.style.width = "100vw";
+canvas.style.height = "100vh";
 
-canvas.id = 'myCanvas';
-canvas.style.position = 'fixed';
-canvas.style.top = '0';
-canvas.style.left = '0';
-// canvas.style.width = '100vw';
-// canvas.style.height = '100vh';
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
-document.body.appendChild(canvas);
-
-let resN64Math = window.innerHeight / 240;
-const context = canvas.getContext('2d');
-
-// The real stuffs
-
-let djuiGlobalTimer = 0
-function get_global_timer() {
-    return djuiGlobalTimer
+// Init WebGL2
+const gl = canvas.getContext("webgl2");
+if (!gl) {
+    throw new Error("WebGL2 not supported");
 }
+gl.enable(gl.BLEND);
+gl.blendFunc(
+    gl.SRC_ALPHA,
+    gl.ONE_MINUS_SRC_ALPHA
+);
 
-const RESOLUTION_DJUI = 1;
-const RESOLUTION_N64 = 2;
-let currentResolution = RESOLUTION_DJUI;
-let resDJUIScale = 1; // Scale for DJUI resolution
+function resizeCanvas() {
 
-// configDjuiScale: 0 = auto, 1 = 0.5, 2 = 0.85, 3 = 1.0, 4 = 1.5
-let configDjuiScale = 0; // You can set this elsewhere as needed
+    const dpr = window.devicePixelRatio || 1;
 
-function djui_gfx_get_scale() {
-    if (configDjuiScale === 0) { // auto
-        const windowHeight = window.innerHeight;
-        if (windowHeight < 768) {
-            return 0.5;
-        } else if (windowHeight < 1440) {
-            return 1.0;
-        } else {
-            return 1.5;
-        }
-    } else {
-        switch (configDjuiScale) {
-            case 1:  return 0.5;
-            case 2:  return 0.85;
-            case 3:  return 1.0;
-            case 4:  return 1.5;
-            default: return 1.0;
-        }
+    const width = Math.floor(window.innerWidth * dpr);
+    const height = Math.floor(window.innerHeight * dpr);
+
+    if (
+        canvas.width !== width ||
+        canvas.height !== height
+    ) {
+        canvas.width = width;
+        canvas.height = height;
+
+        gl.viewport(0, 0, width, height);
     }
 }
 
-function get_res_scale() {
-    if (currentResolution === RESOLUTION_DJUI) {
-        return resDJUIScale;
+window.addEventListener("resize", resizeCanvas);
+
+resizeCanvas();
+
+// SDhader Helpers
+function createShader(gl, type, source) {
+    const shader = gl.createShader(type);
+
+    gl.shaderSource(shader, source);
+    gl.compileShader(shader);
+
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+        console.error(gl.getShaderInfoLog(shader));
+        gl.deleteShader(shader);
+        return null;
     }
-    else if (currentResolution === RESOLUTION_N64) {
-        return resN64Math;
-    }
-    return 1;
+
+    return shader;
 }
 
-function update_canvas_size() {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-    canvas.style.width = `${window.innerWidth}px`;
-    canvas.style.height = `${window.innerHeight}px`;
+function createProgram(gl, vertexSource, fragmentSource) {
+    const vertexShader = createShader(gl, gl.VERTEX_SHADER, vertexSource);
+    const fragmentShader = createShader(gl, gl.FRAGMENT_SHADER, fragmentSource);
 
-    if (!DJUIJS_SAFE_N64) {
-        resN64Math = window.innerHeight / 240;
-    } else {
-        resN64Math = Math.min(window.innerHeight / 240, window.innerWidth / 320);
+    const program = gl.createProgram();
+
+    gl.attachShader(program, vertexShader);
+    gl.attachShader(program, fragmentShader);
+
+    gl.linkProgram(program);
+
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+        console.error(gl.getProgramInfoLog(program));
+        return null;
     }
-    resDJUIScale = djui_gfx_get_scale();
+
+    return program;
 }
 
-function djui_hud_set_resolution(res) {
-    if (res !== RESOLUTION_DJUI && res !== RESOLUTION_N64) {
-        throw new Error('Invalid resolution: must be RESOLUTION_DJUI or RESOLUTION_N64');
+// Shader
+const vertexShaderSource = `#version 300 es
+    precision mediump float;
+
+    in vec2 aPosition;
+    in vec2 aUV;
+    in vec4 aColor;
+
+    uniform vec2 uResolution;
+
+    out vec2 vUV;
+    out vec4 vColor;
+
+    void main() {
+
+        vec2 zeroToOne = aPosition / uResolution;
+        vec2 zeroToTwo = zeroToOne * 2.0;
+        vec2 clipSpace = zeroToTwo - 1.0;
+
+        gl_Position = vec4(
+            clipSpace.x,
+            -clipSpace.y,
+            0.0,
+            1.0
+        );
+
+        vUV = aUV;
+        vColor = aColor;
     }
-    currentResolution = res;
-    djui_update_mouse_scale()
+`;
+
+const fragmentShaderSource = `#version 300 es
+    precision mediump float;
+
+    in vec2 vUV;
+    in vec4 vColor;
+
+    uniform sampler2D uTexture;
+
+    out vec4 outColor;
+
+    void main() {
+        outColor = texture(uTexture, vUV) * vColor;
+    }
+`;
+
+const program = createProgram(
+    gl,
+    vertexShaderSource,
+    fragmentShaderSource
+);
+
+gl.useProgram(program);
+
+// Locations
+const positionLocation = gl.getAttribLocation(program, "aPosition");
+const uvLocation = gl.getAttribLocation(program, "aUV");
+const colorLocation = gl.getAttribLocation(program, "aColor");
+
+const resolutionLocation = gl.getUniformLocation(
+    program,
+    "uResolution"
+);
+
+// Buffers
+const vao = gl.createVertexArray();
+gl.bindVertexArray(vao);
+
+const buffer = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+
+// x y u v r g b a
+const STRIDE = 8 * 4;
+
+gl.enableVertexAttribArray(positionLocation);
+gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, STRIDE, 0);
+
+gl.enableVertexAttribArray(uvLocation);
+gl.vertexAttribPointer(uvLocation, 2, gl.FLOAT, false, STRIDE, 2 * 4);
+
+gl.enableVertexAttribArray(colorLocation);
+gl.vertexAttribPointer(colorLocation, 4, gl.FLOAT, false, STRIDE, 4 * 4);
+
+// Render List
+const renderList = [];
+const CMD_QUAD = 0;
+
+
+// Texture loading
+const textureDB = {};
+
+function load_texture(name, url) {
+
+    const image = new Image();
+    image.src = url;
+
+    image.onload = () => {
+
+        const tex = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, tex);
+
+        gl.texImage2D(
+            gl.TEXTURE_2D,
+            0,
+            gl.RGBA,
+            gl.RGBA,
+            gl.UNSIGNED_BYTE,
+            image
+        );
+
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+        textureDB[name] = {
+            texture: tex,
+            width: image.width,
+            height: image.height
+        };
+    };
 }
 
-function djui_hud_get_resolution() {
-    return currentResolution
+// Create Dummy texture
+function createWhiteTexture(gl) {
+
+    const tex = gl.createTexture();
+
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+
+    const pixel = new Uint8Array([255, 255, 255, 255]);
+
+    gl.texImage2D(
+        gl.TEXTURE_2D,
+        0,
+        gl.RGBA,
+        1,
+        1,
+        0,
+        gl.RGBA,
+        gl.UNSIGNED_BYTE,
+        pixel
+    );
+
+    // CRITICAL: prevent undefined sampling behavior
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+    gl.bindTexture(gl.TEXTURE_2D, null);
+
+    return tex;
 }
 
-update_canvas_size()
+const whiteTexture = createWhiteTexture(gl);
+
+function get_texture_info(name) {
+
+    // already exists
+    if (textureDB[name]) {
+        return textureDB[name];
+    }
+
+    // create placeholder entry
+    const info = {
+        name,
+        texture: whiteTexture,
+        width: 1,
+        height: 1,
+        ready: false,
+        loading: true
+    };
+
+    textureDB[name] = info;
+
+    // start async load automatically
+    const img = new Image();
+    img.src = name; // assume direct path like "toad.png"
+
+    img.onload = () => {
+
+        const tex = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, tex);
+
+        gl.texImage2D(
+            gl.TEXTURE_2D,
+            0,
+            gl.RGBA,
+            gl.RGBA,
+            gl.UNSIGNED_BYTE,
+            img
+        );
+
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+
+        info.texture = tex;
+        info.width = img.width;
+        info.height = img.height;
+
+        info.ready = true;
+        info.loading = false;
+    };
+
+    return info;
+}
+
+function resolveTexture(t) {
+    if (!t) return whiteTexture;
+    if (t.texture) return t.texture; // texture info object
+    return t; // already raw WebGLTexture
+}
+
+// HUD Hook
+const hudRenderCallbacks = [];
+function hook_hud_render(fn) {
+    hudRenderCallbacks.push(fn);
+}
+
+// Recreated Funcs
+const RESOLUTION_DJUI = 0
+const RESOLUTION_N64 = 1
+let djuiRes = 0
+function djui_hud_set_resolution(resolutionType) {
+    djuiRes = resolutionType
+}
+
+function internal_scale_pos(x) {
+    let mathDjui = Math.min(Math.max(Math.round((canvas.height / 240) / 4.0, 0.5), 0.5), 1.5)
+    let mathN64 = (canvas.height / 240)
+    return x*(djuiRes == RESOLUTION_DJUI ? mathDjui : mathN64)
+}
 
 function djui_hud_get_screen_width() {
-    if (currentResolution === RESOLUTION_DJUI || !DJUIJS_SAFE_N64) {
-        return canvas.width / get_res_scale();
-    } else {
-        return canvas.width / get_res_scale();
-    }
+    return canvas.width/internal_scale_pos(1)
 }
 
 function djui_hud_get_screen_height() {
-    if (currentResolution === RESOLUTION_DJUI) {
-        return canvas.height / resDJUIScale;
-    } else if (currentResolution === RESOLUTION_N64) {
-        if (!DJUIJS_SAFE_N64) {
-            return 240; // N64 height is always 240 pixels
-        } else {
-            return canvas.height / get_res_scale()
-        }
-    }
+    return canvas.height/internal_scale_pos(1)
 }
 
+let djuiR = 1
+let djuiG = 1
+let djuiB = 1
+let djuiA = 1
 function djui_hud_set_color(r, g, b, a) {
-    a = a / 255;
-    context.globalAlpha = a;
-    context.fillStyle = `rgb(${r}, ${g}, ${b})`;
+    djuiR = (r%256)/255
+    djuiG = (g%256)/255
+    djuiB = (b%256)/255
+    djuiA = (a%256)/255
 }
 
-const renderList = [];
-
-let currentRotation = 0;
-let currentPivotX = 0;
-let currentPivotY = 0;
-
+let djuiRotation = 0;
+let djuiPivotX = 0;
+let djuiPivotY = 0;
 function djui_hud_set_rotation(rotation, pivotX, pivotY) {
-    currentRotation = (-rotation / 0x10000) * 360;
-    currentPivotX = pivotX;
-    currentPivotY = pivotY;
+    djuiRotation = rotation;
+    djuiPivotX = pivotX;
+    djuiPivotY = pivotY;
 }
 
-function apply_rotation_context(x, y, width, height) {
-    const pivotX = x + width * currentPivotX;
-    const pivotY = y + height * currentPivotY;
-    context.translate(pivotX, pivotY);
-    context.rotate(currentRotation * Math.PI / 180);
-    context.translate(-pivotX, -pivotY);
+function djui_hud_render_rect(x, y, w, h) {
+    renderList.push({
+        type: CMD_QUAD,
+
+        x: internal_scale_pos(x),
+        y: internal_scale_pos(y),
+        w: internal_scale_pos(w),
+        h: internal_scale_pos(h),
+
+        u1: 0, v1: 0,
+        u2: 1, v2: 1,
+
+        texture: whiteTexture,
+
+        r: djuiR,
+        g: djuiG,
+        b: djuiB,
+        a: djuiA,
+
+        rotation: djuiRotation,
+        pivotX: djuiPivotX,
+        pivotY: djuiPivotY
+    });
 }
 
-let MOUSE_BUTTON_1 = (1 << 0)
-let MOUSE_BUTTON_2 = (1 << 1)
-let MOUSE_BUTTON_3 = (1 << 2)
-let MOUSE_BUTTON_4 = (1 << 3)
-let MOUSE_BUTTON_5 = (1 << 4)
+function djui_hud_render_texture(tex, x, y, w, h) {
 
-let L_MOUSE_BUTTON = MOUSE_BUTTON_1
-let M_MOUSE_BUTTON = MOUSE_BUTTON_2
-let R_MOUSE_BUTTON = MOUSE_BUTTON_3
+    if (!tex) return;
 
-let _source_mouse_x = 0;
-let _source_mouse_y = 0;
-let _djui_mouse_x = 0;
-let _djui_mouse_y = 0;
-let _djui_mouse_buttons_down = 0;
-let _djui_mouse_buttons_prev = 0;
+    w = w * tex.width
+    h = h * tex.height
 
-// Mouse Listener
-function djui_update_mouse_scale(e) {
-    _djui_mouse_x = (_source_mouse_x) / get_res_scale();
-    _djui_mouse_y = (_source_mouse_y) / get_res_scale();
-};
+    renderList.push({
+        type: CMD_QUAD,
 
+        x: internal_scale_pos(x),
+        y: internal_scale_pos(y),
+        w: internal_scale_pos(w),
+        h: internal_scale_pos(h),
 
-canvas.addEventListener('mousemove', function (e) {
-    const rect = canvas.getBoundingClientRect();
-    _source_mouse_x = e.clientX - rect.left
-    _source_mouse_y = e.clientY - rect.top
-    djui_update_mouse_scale(e)
-});
+        u1: 0, v1: 0,
+        u2: 1, v2: 1,
 
-canvas.addEventListener('mousedown', function (e) {
-    _djui_mouse_buttons_down |= (1 << e.button);
-});
+        texture: tex.texture,
 
-canvas.addEventListener('mouseup', function (e) {
-    _djui_mouse_buttons_down &= ~(1 << e.button);
-});
-window.addEventListener('mouseout', (e) => {
-    _djui_mouse_buttons_down &= ~(1 << e.button);
-});
+        r: djuiR,
+        g: djuiG,
+        b: djuiB,
+        a: djuiA,
 
-// Mobile "Mouse" Support
-function update_touch_pos(e) {
-    const rect = canvas.getBoundingClientRect();
-    const touch = e.touches[0] || e.changedTouches[0];
-
-    if (touch) {
-        _source_mouse_x = touch.clientX - rect.left;
-        _source_mouse_y = touch.clientY - rect.top;
-    }
-
-    e.preventDefault();
-    djui_update_mouse_scale(e);
+        rotation: djuiRotation,
+        pivotX: djuiPivotX,
+        pivotY: djuiPivotY
+    });
 }
 
-canvas.addEventListener('touchstart', function (e) {
-    update_touch_pos(e);
-    _djui_mouse_buttons_down |= (1 << 0);
-}, { passive: false });
+function djui_hud_render_texture_tile(tex, x, y, w, h, tx, ty, tw, th) {
 
+    if (!tex) return;
 
-canvas.addEventListener('touchmove', function (e) {
-    update_touch_pos(e);
-}, { passive: false });
+    w = w * tex.width
+    h = h * tex.height
+    
+    renderList.push({
+        type: CMD_QUAD,
 
-canvas.addEventListener('touchend', function (e) {
-    update_touch_pos(e);
-    _djui_mouse_buttons_down &= ~(1 << 0);
-}, { passive: false });
+        x: internal_scale_pos(x),
+        y: internal_scale_pos(y),
+        w: internal_scale_pos(w),
+        h: internal_scale_pos(h),
 
-canvas.addEventListener('touchcancel', function (e) {
-    _djui_mouse_buttons_down &= ~(1 << 0);
-}, { passive: false });
+        u1: tx / tex.width,
+        v1: ty / tex.height,
+        u2: (tx + tw) / tex.width,
+        v2: (ty + th) / tex.height,
 
+        texture: tex.texture,
 
-function djui_hud_get_mouse_x() {
-    return _djui_mouse_x;
+        r: djuiR,
+        g: djuiG,
+        b: djuiB,
+        a: djuiA,
+
+        rotation: djuiRotation,
+        pivotX: djuiPivotX,
+        pivotY: djuiPivotY
+    });
 }
 
-function djui_hud_get_mouse_y() {
-    return _djui_mouse_y;
+const FONT_NORMAL = 0
+const FONT_ALIASED = 1
+
+let djuiFont = 0
+function djui_hud_set_font(fontType) {
+    djuiFont = fontType
 }
 
-function djui_hud_get_mouse_buttons_down() {
-    return _djui_mouse_buttons_down;
-}
+// Rectangle Rendering
 
-function djui_hud_get_mouse_buttons_pressed() {
-    return (_djui_mouse_buttons_down & ~_djui_mouse_buttons_prev);
-}
+function pushRectVertices(vertices, cmd) {
+    const tex = whiteTexture;
+    const u1 = 0, v1 = 0;
+    const u2 = 1, v2 = 1;
+    const radians = cmd.rotation * (Math.PI * 2 / 65535);
+    const cos = Math.cos(radians);
+    const sin = Math.sin(radians);
 
-function djui_hud_get_mouse_buttons_released() {
-    return (~_djui_mouse_buttons_down & _djui_mouse_buttons_prev);
-}
+    const pivotWorldX = cmd.x + cmd.w * cmd.pivotX;
+    const pivotWorldY = cmd.y + cmd.h * cmd.pivotY;
 
-function djui_hud_render_rect(x, y, width, height) {
-    const scale = get_res_scale();
-    const sx = x * scale;
-    const sy = y * scale;
-    const sw = width * scale;
-    const sh = height * scale;
-    context.save();
-    apply_rotation_context(sx, sy, sw, sh);
-    context.fillRect(sx, sy, sw, sh);
-    context.restore();
-}
+    const corners = [
+        [cmd.x,         cmd.y],
+        [cmd.x + cmd.w, cmd.y],
+        [cmd.x,         cmd.y + cmd.h],
+        [cmd.x + cmd.w, cmd.y + cmd.h],
+    ];
 
-const fontStyles = document.createElement('style');
-const FONT_NORMAL = 1;
-const FONT_ALIASED = 2;
-fontStyles.textContent = `
-@font-face {font-family: FONT_NORMAL; src: url('djui-js/sm64coopdx-normal.ttf') format('truetype'); font-weight: normal; font-style: normal;}
-@font-face {font-family: FONT_ALIASED; src: url('djui-js/sm64coopdx-aliased.ttf') format('truetype'); font-weight: normal; font-style: normal;}
-`;
-document.head.appendChild(fontStyles);
+    const rotated = corners.map(([x, y]) => {
 
-context.font = '24px FONT_NORMAL';
-currentFont = 'FONT_NORMAL'
-currentFontSize = 32;
-function djui_hud_set_font(font) {
-    if (font === FONT_NORMAL) {
-        currentFont = 'FONT_NORMAL';
-        currentFontSize = 32;
-    } else if (font === FONT_ALIASED) {
-        currentFont = 'FONT_ALIASED';
-        currentFontSize = 32;
-    }
-}
-function djui_hud_measure_text(text) {
-    const scale = get_res_scale();
-    context.save();
-    context.textBaseline = 'top';
-    context.font = `${currentFontSize * scale}px ${currentFont}`;
-    const metrics = context.measureText(text);
-    context.restore();
-    return metrics.width / scale;
-}
+        // translate to pivot origin
+        let dx = x - pivotWorldX;
+        let dy = y - pivotWorldY;
 
-function djui_hud_print_text(text, x, y, scale) {
-    const resScale = get_res_scale();
-    context.textBaseline = 'top'; // Align text at the top
-    context.imageSmoothingEnabled = false;
-    context.font = `${scale * currentFontSize * resScale}px ${currentFont}`;
-    context.fillText(text, x * resScale, y * resScale);
-}
+        // rotate
+        const rx = dx * cos - dy * sin;
+        const ry = dx * sin + dy * cos;
 
-function get_texture_info(texName) {
-    const img = new Image();
-    img.src = texName
-    return img;
-}
+        // translate back
+        return [
+            rx + pivotWorldX,
+            ry + pivotWorldY
+        ];
+    });
 
-const gTextures = {
-    luigi: get_texture_info('djui-js/luigi.png'),
-    toad: get_texture_info('djui-js/toad.png'),
-    waluigi: get_texture_info('djui-js/waluigi.png'),
-    wario: get_texture_info('djui-js/wario.png'),
-};
+    const c = [
+        cmd.r,
+        cmd.g,
+        cmd.b,
+        cmd.a
+    ];
 
-function djui_hud_render_texture(texture, x, y, scaleX, scaleY) {
-    if (!(texture instanceof HTMLImageElement) || !texture.complete || texture.width === 0) {
-        return;
-    }
+    const [tl, tr, bl, br] = rotated;
 
-    const scale = get_res_scale();
-    const drawX = x * scale;
-    const drawY = y * scale;
-    const drawW = texture.width * scaleX * scale;
-    const drawH = texture.height * scaleY * scale;
-
-    context.save();
-    apply_rotation_context(drawX, drawY, drawW, drawH);
-    context.imageSmoothingEnabled = false;
-    context.drawImage(texture, drawX, drawY, drawW, drawH);
-    context.restore();
-}
-
-function djui_hud_render_texture_tile(texture, x, y, scaleX, scaleY, tileX, tileY, tileWidth, tileHeight) {
-    if (!(texture instanceof HTMLImageElement) || !texture.complete || texture.naturalWidth === 0) {
-        return;
-    }
-
-    const scale = get_res_scale();
-    const drawX = x * scale;
-    const drawY = y * scale;
-    const drawW = tileWidth * scaleX * scale;
-    const drawH = tileHeight * scaleY * scale;
-
-    context.save();
-    apply_rotation_context(drawX, drawY, drawW, drawH);
-    context.imageSmoothingEnabled = false;
-    context.drawImage(
-        texture,
-        tileX, tileY, tileWidth, tileHeight, // source crop rectangle
-        drawX, drawY, drawW, drawH           // destination on canvas
+    // triangle 1
+    vertices.push(
+        tl[0], tl[1], u1, v1, ...c,
+        tr[0], tr[1], u2, v1, ...c,
+        bl[0], bl[1], u1, v2, ...c
     );
-    context.restore();
+
+    // triangle 2
+    vertices.push(
+        bl[0], bl[1], u1, v2, ...c,
+        tr[0], tr[1], u2, v1, ...c,
+        br[0], br[1], u2, v2, ...c
+    );
+
 }
 
-// DJUI Popups
-let DjuiPopup = []
-let sPopupListY = 4
-const DJUI_POPUP_LIFETIME = 180
+function flushRenderList() {
 
-function djui_hud_popup_create(message, lines) {
-    // Log just in case
-    console.log(message)
-    
-    let height = lines * 32 + 32
-    let split = message.split("\n")
-    DjuiPopup.push({
-        text: split,
-        lines: lines,
-        createTime: get_global_timer(),
-        height: height,
-        x: 8,
-        y: -height,
-        alpha: 1.0,
-    })
+    gl.activeTexture(gl.TEXTURE0);
+    gl.useProgram(program);
+    gl.uniform1i(gl.getUniformLocation(program, "uTexture"), 0);
 
-    sPopupListY -= height + 4
-    // play_sound(SOUND_MENU_PINCH_MARIO_FACE, gGlobalSoundSource);
-}
+    gl.uniform2f(resolutionLocation, canvas.width, canvas.height);
 
-function djui_popup_update() {
-    let y = sPopupListY + 4
-    let screenWidth = djui_hud_get_screen_width()
+    gl.bindVertexArray(vao);
 
-    for (let i = (DjuiPopup.length - 1); i >= 0; ) {
-        let node = DjuiPopup[i]
-        if (node == null) {
-            i--
-            continue
-        }
-        node.y = y
-        y += node.height + 14
+    for (const cmd of renderList) {
 
-        let elapsed = get_global_timer() - node.createTime
+        const tex = cmd.texture || whiteTexture;
 
-        // fade out
-        let alpha = Math.min(Math.max((DJUI_POPUP_LIFETIME - elapsed)/30, 0), 1)
-        alpha *= alpha
-        if (elapsed > DJUI_POPUP_LIFETIME) alpha = 0
+        const c = [cmd.r, cmd.g, cmd.b, cmd.a];
 
-        // Render Boarder (Thanks DJUI)
-        djui_hud_set_color(0, 0, 0, 180 * alpha)
-        djui_hud_render_rect(screenWidth - 404 - node.x, node.y, 4, node.height)
-        djui_hud_render_rect(screenWidth - node.x, node.y, 4, node.height)
-        djui_hud_render_rect(screenWidth - 404 - node.x, node.y - 4, 408, 4)
-        djui_hud_render_rect(screenWidth - 404 - node.x, node.y + node.height, 408, 4)
-        // Render BG
-        djui_hud_set_color(0, 0, 0, 220 * alpha)
-        djui_hud_render_rect(screenWidth - 400 - node.x, node.y, 400, node.height)
-        // Render Text
-        djui_hud_set_font(FONT_NORMAL);
-        djui_hud_set_color(255, 255, 255, 255 * alpha)
-        for (let text of node.text) {
-            let height = node.height*0.5 - (node.text.length)*15 + node.text.indexOf(text)*30
-            djui_hud_print_text(text, screenWidth - 200 - djui_hud_measure_text(text)*0.5 - node.x, node.y + height, 1)
-        }
-        
-        // remove popup if fully faded
-        if (alpha === 0) {
-            DjuiPopup.splice(i, 1)
-            continue
-        }
+        const x1 = cmd.x;
+        const y1 = cmd.y;
+        const x2 = cmd.x + cmd.w;
+        const y2 = cmd.y + cmd.h;
 
-        i--
-    }
+        const u1 = cmd.u1;
+        const v1 = cmd.v1;
+        const u2 = cmd.u2;
+        const v2 = cmd.v2;
 
-    // move entire popup list toward 4
-    sPopupListY = sPopupListY * 0.75 + 1
-    if (sPopupListY > 8) sPopupListY = 8
-}
+        const radians = cmd.rotation * (Math.PI * 2 / 65535);
+        const cos = Math.cos(radians);
+        const sin = Math.sin(radians);
 
-const hookedFunctions = [];
-function hook_event(func) {
-    if (typeof func === 'function') {
-        hookedFunctions.push(func);
+        const pivotX = cmd.x + cmd.w * cmd.pivotX;
+        const pivotY = cmd.y + cmd.h * cmd.pivotY;
+
+        const corners = [
+            [x1, y1],
+            [x2, y1],
+            [x1, y2],
+            [x2, y2],
+        ];
+
+        const rotated = corners.map(([x, y]) => {
+
+            let dx = x - pivotX;
+            let dy = y - pivotY;
+
+            return [
+                dx * cos - dy * sin + pivotX,
+                dx * sin + dy * cos + pivotY
+            ];
+        });
+
+        const [tl, tr, bl, br] = rotated;
+
+        const vertices = new Float32Array([
+            tl[0], tl[1], u1, v1, ...c,
+            tr[0], tr[1], u2, v1, ...c,
+            bl[0], bl[1], u1, v2, ...c,
+
+            bl[0], bl[1], u1, v2, ...c,
+            tr[0], tr[1], u2, v1, ...c,
+            br[0], br[1], u2, v2, ...c
+        ]);
+
+        gl.bindTexture(gl.TEXTURE_2D, tex);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+        gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.DYNAMIC_DRAW);
+
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
     }
 }
 
-let lastError = ""
-let lastErrorTimer = 0
-function djui_on_render() {
-    renderList.length = 0;
-    update_canvas_size()
+const TICK_RATE = 1000 / DJUI_CONFIG_FPS;
 
-    context.clearRect(0, 0, canvas.width, canvas.height);
-    for (const fn of hookedFunctions) {
-        try {
+let lastTick = 0;
+
+function frame(now) {
+    requestAnimationFrame(frame);
+
+    if (now - lastTick >= TICK_RATE) {
+
+        lastTick += TICK_RATE;
+
+        renderList.length = 0;
+
+        // Reset vars before rendering
+        djuiR = 255
+        djuiG = 255
+        djuiB = 255
+        djuiA = 255
+        djuiRotation = 0
+        djuiPivotX = 0
+        djuiPivotY = 0
+
+        for (const fn of hudRenderCallbacks) {
             fn();
-        } catch (error) {
-            fn._errored = true;
-            lastErrorTimer = 150;
-            // Only log the useful part
-            console.error(`${error.message} (${error.fileName || "unknown file"}:${error.lineNumber || "?"})`);
         }
     }
-    
-    djui_hud_set_resolution(RESOLUTION_DJUI);
 
-    if (lastErrorTimer > 0) {
-        djui_hud_set_font(FONT_NORMAL);
-        djui_hud_set_rotation(0, 0, 0);
-
-        const error = `'${document.title}' has script errors!`
-        djui_hud_set_color(0, 0, 0, 255);
-        djui_hud_print_text(error, djui_hud_get_screen_width() * 0.5 - djui_hud_measure_text(error) * 0.5 + 1, 31, 1);
-        djui_hud_set_color(255, 0, 0, 255);
-        djui_hud_print_text(error, djui_hud_get_screen_width() * 0.5 - djui_hud_measure_text(error) * 0.5, 30, 1);
-
-        lastErrorTimer = lastErrorTimer - 1
-    }
-    _djui_mouse_buttons_prev = _djui_mouse_buttons_down;
-
-    djui_popup_update()
-
-    djuiGlobalTimer++
+    flushRenderList();
 }
-setInterval(djui_on_render, 1000/DJUIJS_FPS)
+
+requestAnimationFrame(frame);
+
+// Expose functions
+Object.assign(window, {
+    RESOLUTION_DJUI,
+    RESOLUTION_N64,
+
+    get_texture_info,
+
+    hook_hud_render,
+
+    djui_hud_render_rect,
+    djui_hud_set_color,
+    djui_hud_set_rotation,
+    djui_hud_render_texture,
+    djui_hud_render_texture_tile,
+    djui_hud_set_resolution,
+    djui_hud_get_screen_width,
+    djui_hud_get_screen_height,
+});
